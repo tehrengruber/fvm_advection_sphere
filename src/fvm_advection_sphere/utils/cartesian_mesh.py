@@ -96,8 +96,8 @@ def cartesian_mesh(Ni: int, Nj: int, xlim: Tuple[float, float], ylim: Tuple[floa
     for j in range(0, Nj):
         for i in range(0, Ni):
             cell_id = _llp_to_id(i, j)
-            c2e[cell_id, 1] = c2e[_llp_to_id((i + Ni - 1) % Ni, j), 3]
-            c2e[cell_id, 2] = c2e[_llp_to_id(i, (j + Nj - 1) % Nj), 0]
+            c2e[cell_id, 1] = c2e[_llp_to_id((i + Ni + 1) % Ni, j), 3]
+            c2e[cell_id, 2] = c2e[_llp_to_id(i, (j + Nj + 1) % Nj), 0]
 
     # e2v
     for j in range(0, Nj):
@@ -125,9 +125,18 @@ def cartesian_mesh(Ni: int, Nj: int, xlim: Tuple[float, float], ylim: Tuple[floa
     # geometry
     #
     dx, dy = (xlim[1] - xlim[0]) / Ni, (ylim[1] - ylim[0]) / Nj
-    xc = np.linspace(xlim[0]+dx/2, xlim[1]+dx/2, num=Ni, endpoint=False)
-    yc = np.linspace(ylim[0]+dy/2, ylim[1]+dy/2, num=Nj, endpoint=False)
+
+    # vertex coordinates
+    xs = np.linspace(xlim[0], xlim[1], num=Ni, endpoint=False)
+    ys = np.linspace(ylim[0], ylim[1], num=Nj, endpoint=False)
+    points = np.zeros((num_vertices, 2))
+    for j in range(0, Nj):
+        for i in range(0, Ni):
+            points[_llp_to_id(i, j), :] = xs[i], ys[j]
+
     # cell barycenters (vertices in the dual mesh)
+    xc = xs + dx / 2
+    yc = ys + dy / 2
     barycenters = np.zeros((num_cells, 2))
     for j in range(0, Nj):
         for i in range(0, Ni):
@@ -172,6 +181,7 @@ def cartesian_mesh(Ni: int, Nj: int, xlim: Tuple[float, float], ylim: Tuple[floa
         e2v=e2v,
         e2c=e2c,
         # geometry
+        points=points,
         dual_face_length=dual_face_length,
         dual_face_normal=dual_face_normal,
         face_orientation=face_orientation
