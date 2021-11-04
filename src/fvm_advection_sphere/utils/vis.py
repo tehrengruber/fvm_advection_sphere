@@ -20,6 +20,7 @@ def make_dataset_from_arrays(
     vertex_fields: Dict[str, npt.ArrayLike] = None,
     edge_fields: Dict[str, npt.ArrayLike] = None,
     cell_fields: Dict[str, npt.ArrayLike] = None,
+    include_cell_conn_in_vertex_data = True
 ) -> pv.MultiBlock:
     """Create a dataset with one block per primitive."""
     points = np.asarray(points)
@@ -63,6 +64,10 @@ def make_dataset_from_arrays(
     vertex_fields = vertex_fields or {}
     for field_name in vertex_fields:
         blocks["vertices"].point_data[field_name] = vertex_fields[field_name]
+
+    blocks["vertices_interpolated"] = pv.PolyData(prepared_points, prepared_cells)
+    for field_name in vertex_fields:
+        blocks["vertices_interpolated"].point_data[field_name] = vertex_fields[field_name]
 
     return blocks
 

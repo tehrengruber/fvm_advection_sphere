@@ -2,7 +2,7 @@ from typing import Tuple
 from types import SimpleNamespace
 import numpy as np
 
-def cartesian_mesh(Ni: int, Nj: int, xlim: Tuple[float, float], ylim: Tuple[float, float]):
+def setup_mesh(Ni: int, Nj: int, xlim: Tuple[float, float], ylim: Tuple[float, float]):
     """
     Generate a periodic cartesian mesh with Ni x Nj vertices
 
@@ -121,6 +121,13 @@ def cartesian_mesh(Ni: int, Nj: int, xlim: Tuple[float, float], ylim: Tuple[floa
             v2e[c2v[cell_id, 0], 2] = c2e[cell_id_bl, 2]
             v2e[c2v[cell_id, 0], 3] = c2e[cell_id_bl, 1]
 
+    # flags
+    cflags_periodic = np.zeros(num_cells, dtype=np.bool)
+    for j in range(0, Nj):
+        for i in range(0, Ni):
+            cell_id = _llp_to_id(i, j)
+            cflags_periodic[cell_id] = i+1 == Ni or j+1 == Nj
+
     #
     # geometry
     #
@@ -145,6 +152,7 @@ def cartesian_mesh(Ni: int, Nj: int, xlim: Tuple[float, float], ylim: Tuple[floa
             barycenters[cell_id, 1] = yc[j]
 
     # face properties
+    dual_face_normal_weighted = np.zeros((num_edges, 2))
     dual_face_length = np.zeros(num_edges)
     dual_face_normal = np.zeros((num_edges, 2))
     for j in range(0, Nj):
@@ -163,26 +171,33 @@ def cartesian_mesh(Ni: int, Nj: int, xlim: Tuple[float, float], ylim: Tuple[floa
                 bc_b[1] -= ylim[1]-ylim[0]
 
             for e, bc0, bc1 in ((c2e[cell_id, 0], bc_b, bc_c), (c2e[cell_id, 3], bc_c, bc_l)):
-                S = (bc0-bc1) @ np.array([[0, 1], [-1, 0]])
-                dual_face_length[e] = np.linalg.norm(S)
-                dual_face_normal[e, :] = S/dual_face_length[e]
+                dual_face_normal_weighted[e] = (bc0-bc1) @ np.array([[0, 1], [-1, 0]])
+                dual_face_length[e] = np.linalg.norm(dual_face_normal_weighted[e])
+                dual_face_normal[e, :] = dual_face_normal_weighted[e]/dual_face_length[e]
 
-    face_orientation = np.zeros((num_vertices, 4))
+    dual_face_orientation = np.zeros((num_vertices, 4))
     for v in range(0, num_vertices):
         for i in range(0, 4):
-            face_orientation[v, i] = 1 if e2v[v2e[v, i], 0] == v else -1
+            dual_face_orientation[v, i] = 1 if e2v[v2e[v, i], 0] == v else -1
+
+    vol = np.ones(num_vertices)
 
     return SimpleNamespace(
         num_vertices=num_vertices,
         num_edges=num_edges,
+        # connectivities
         c2v=c2v,
         c2e=c2e,
         v2e=v2e,
         e2v=e2v,
         e2c=e2c,
+        # flags
+        cflags_periodic=cflags_periodic,
         # geometry
         points=points,
+        vol=vol,
+        dual_face_normal_weighted=dual_face_normal_weighted,
         dual_face_length=dual_face_length,
         dual_face_normal=dual_face_normal,
-        face_orientation=face_orientation
+        dual_face_orientation=dual_face_orientation,
     )
