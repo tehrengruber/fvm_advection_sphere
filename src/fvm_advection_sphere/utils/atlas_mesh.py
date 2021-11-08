@@ -55,7 +55,7 @@ def _atlas_connectivity_to_numpy(atlas_conn, *, out=None, skip_neighbor_indicato
         cols = atlas_conn.cols(i)
         for nb in range(cols):
             out[i, nb] = atlas_conn[i, nb]
-        out[i, cols+1:]=-1
+        out[i, cols:]=-1
 
     return out
 
@@ -72,8 +72,9 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
     build_node_to_cell_connectivity(mesh)
     build_median_dual_mesh(mesh)
 
-    num_vertices = mesh.nodes.size
+    num_cells = mesh.cells.size
     num_edges = mesh.edges.size
+    num_vertices = mesh.nodes.size
 
     #
     # connectivities
@@ -85,17 +86,20 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
     c2v = _atlas_connectivity_to_numpy(mesh.cells.node_connectivity)
     c2e = _atlas_connectivity_to_numpy(mesh.cells.edge_connectivity)
 
-    assert v2e.shape[0] == mesh.nodes.size
-    assert v2c.shape[0] == mesh.nodes.size
-    assert e2v.shape[0] == mesh.edges.size
-    assert e2c.shape[0] == mesh.edges.size
-    assert c2v.shape[0] == mesh.cells.size
-    assert c2e.shape[0] == mesh.cells.size
+    assert v2e.shape[0] == num_vertices
+    assert v2c.shape[0] == num_vertices
+    assert e2v.shape[0] == num_edges
+    assert e2c.shape[0] == num_edges
+    assert c2v.shape[0] == num_cells
+    assert c2e.shape[0] == num_cells
+
+    # flags
+    vertex_flags = np.array(mesh.nodes.flags(), copy=False)
 
     #
     # geometrical properties
     #
-    points = np.array(mesh.nodes.lonlat, copy=False)
+    points = np.array(mesh.nodes.lonlat, copy=False) * deg2rad * radius
 
     # face orientation
     edges_per_node = mesh.nodes.edge_connectivity.maxcols
@@ -130,6 +134,8 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
         v2e=v2e,
         e2v=e2v,
         e2c=e2c,
+        # flags
+        vertex_flags=vertex_flags,
         # geometry
         points=points,
         vol=vol,

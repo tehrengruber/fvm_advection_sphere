@@ -14,7 +14,7 @@ def fvm_advect(
     for e in range(0, mesh.num_edges):
         # upwind flux (instructive)
         v1, v2 = mesh.e2v[e, :]
-        weighted_normal_velocity = np.dot(vel, mesh.dual_face_normal_weighted[e])  # velocity projected onto the normal
+        weighted_normal_velocity = np.dot(vel[e], mesh.dual_face_normal_weighted[e])  # velocity projected onto the normal
         if weighted_normal_velocity > 0:
             flux[e] = rho[v1] * weighted_normal_velocity
         else:
@@ -23,6 +23,6 @@ def fvm_advect(
     # compute density in the next timestep
     for v in range(0, mesh.num_vertices):
         #rho[v] = rho - δt / mesh.volume[v] * sum(flux[e] * face_orientation[v, local_e] for local_e, e in enumerate(mesh.v2e[v, :]))
-        rho[v] = rho[v] - δt * sum(flux[e] * mesh.dual_face_orientation[v, local_e] for local_e, e in enumerate(mesh.v2e[v, :]))
+        rho[v] = rho[v] - δt / mesh.vol[v] * sum(flux[e] * mesh.dual_face_orientation[v, local_e] for local_e, e in enumerate(mesh.v2e[v, :]))
 
 

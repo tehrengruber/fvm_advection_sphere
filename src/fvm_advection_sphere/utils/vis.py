@@ -41,10 +41,17 @@ def make_dataset_from_arrays(
 
     # For pyvista, the format of each primitive in the list should be:
     #     (n_items, item_0, item_1, ... item_n)
-    prepared_cells = np.concatenate(
+    def prepare_conn(conn):
+        num_neighbors = np.add.reduce(np.where(conn != -1, 1, 0), axis=1)
+        tmp = np.concatenate((num_neighbors[:, None], conn), axis=1)
+        return tmp[np.concatenate((np.full((conn.shape[0], 1), True, dtype=bool), conn != -1), axis=1)]
+
+    prepared_cells = prepare_conn(cells)
+    prepared_edges = prepare_conn(edges)
+    prepared_cells2 = np.concatenate(
         (np.asarray([cells.shape[-1]] * len(cells))[:, None], cells), axis=1
     )
-    prepared_edges = np.concatenate(
+    prepared_edges2 = np.concatenate(
         (np.asarray([edges.shape[-1]] * len(edges))[:, None], edges), axis=1
     )
 
