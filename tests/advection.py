@@ -8,7 +8,7 @@ from fvm_advection_sphere.advection import fvm_advect
 import fvm_advection_sphere.utils.vis as vis
 
 # initialize mesh
-mesh_type = "serialized" # atlas, atlas_from_file
+mesh_type = "atlas" # atlas, atlas_from_file
 # regular mesh
 if mesh_type == "regular":
     Ni = 100
