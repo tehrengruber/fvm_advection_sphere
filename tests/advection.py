@@ -1,5 +1,4 @@
 import numpy as np
-import pyvista as pv
 
 import fvm_advection_sphere.utils.regular_mesh as regular_mesh
 import fvm_advection_sphere.utils.atlas_mesh as atlas_mesh
@@ -23,19 +22,29 @@ niter = 100
 
 # initialize fields
 rho = np.zeros(mesh.num_vertices)
-origin = mesh.points.min(axis=0)
-extent = mesh.points.max(axis=0)-mesh.points.min(axis=0)
-xlim = (min(mesh.points[:, 0]), max(mesh.points[:, 0]))
-ylim = (min(mesh.points[:, 1]), max(mesh.points[:, 1]))
+g11 = np.zeros(mesh.num_vertices)
+g22 = np.zeros(mesh.num_vertices)
+gac = np.zeros(mesh.num_vertices)
+origin = mesh.xyarc.min(axis=0)
+extent = mesh.xyarc.max(axis=0)-mesh.xyarc.min(axis=0)
+xlim = (min(mesh.xyarc[:,0]), max(mesh.xyarc[:,0]))
+ylim = (min(mesh.xyarc[:,1]), max(mesh.xyarc[:,1]))
+rsina = np.sin(mesh.xyrad[:,1]) 
+rcosa = np.cos(mesh.xyrad[:,1])
+g11[:] = 1.0 / rcosa[:]
+g22[:] = 1.0
+gac[:] = rcosa[:]
+
+
 for v in range(0, mesh.num_vertices):
-    rel_distance_from_origin = np.linalg.norm((mesh.points[v, :]-origin))/np.linalg.norm(extent)
+    rel_distance_from_origin = np.linalg.norm((mesh.xyarc[v, :]-origin))/np.linalg.norm(extent)
     if rel_distance_from_origin < 0.2:
         rho[v] = 1
 
 vis.start_pyvista()
 
 c2v = mesh.c2v
-ds = vis.make_dataset_from_arrays(mesh.points, edges=mesh.e2v, cells=c2v, vertex_fields={"rho": rho})
+ds = vis.make_dataset_from_arrays(mesh.xyarc, edges=mesh.e2v, cells=c2v, vertex_fields={"rho": rho})
 
 p = vis.plot_mesh(ds, interpolate_before_map=True)
 p.show(cpos="xy", interactive_update=True, auto_close=False) # non-blocking

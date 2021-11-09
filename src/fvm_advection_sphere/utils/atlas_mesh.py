@@ -99,7 +99,9 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
     #
     # geometrical properties
     #
-    points = np.array(mesh.nodes.lonlat, copy=False) * deg2rad * radius
+    xydeg = np.array(mesh.nodes.lonlat, copy=False)
+    xyrad = np.array(mesh.nodes.lonlat, copy=False) * deg2rad
+    xyarc = np.array(mesh.nodes.lonlat, copy=False) * deg2rad * radius
 
     # face orientation
     edges_per_node = mesh.nodes.edge_connectivity.maxcols
@@ -137,7 +139,9 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
         # flags
         vertex_flags=vertex_flags,
         # geometry
-        points=points,
+        xydeg=xydeg,
+        xyrad=xyrad,
+        xyarc=xyarc,
         vol=vol,
         dual_face_normal_weighted=dual_face_normal_weighted,
         dual_face_orientation=dual_face_orientation

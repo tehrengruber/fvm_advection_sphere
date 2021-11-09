@@ -136,10 +136,10 @@ def setup_mesh(Ni: int, Nj: int, xlim: Tuple[float, float], ylim: Tuple[float, f
     # vertex coordinates
     xs = np.linspace(xlim[0], xlim[1], num=Ni, endpoint=False)
     ys = np.linspace(ylim[0], ylim[1], num=Nj, endpoint=False)
-    points = np.zeros((num_vertices, 2))
+    xycrd = np.zeros((num_vertices, 2))
     for j in range(0, Nj):
         for i in range(0, Ni):
-            points[_llp_to_id(i, j), :] = xs[i], ys[j]
+            xycrd[_llp_to_id(i, j), :] = xs[i], ys[j]
 
     # cell barycenters (vertices in the dual mesh)
     xc = xs + dx / 2
@@ -194,7 +194,7 @@ def setup_mesh(Ni: int, Nj: int, xlim: Tuple[float, float], ylim: Tuple[float, f
         # flags
         cflags_periodic=cflags_periodic,
         # geometry
-        points=points,
+        xycrd=xycrd,
         vol=vol,
         dual_face_normal_weighted=dual_face_normal_weighted,
         dual_face_length=dual_face_length,
