@@ -2,7 +2,7 @@ import numpy as np
 
 import fvm_advection_sphere.utils.regular_mesh as regular_mesh
 import fvm_advection_sphere.utils.atlas_mesh as atlas_mesh
-from fvm_advection_sphere.advection import fvm_advect
+from fvm_advection_sphere.advection import fvm_advect, advector_in_edges
 
 import fvm_advection_sphere.utils.vis as vis
 
@@ -15,9 +15,7 @@ from atlas4py import StructuredGrid
 mesh = atlas_mesh.setup_mesh(StructuredGrid("O32"))
 
 # parameters
-vel = np.zeros((mesh.num_edges, 2))
-vel[:, 0] = 60000
-δt = 1 # time step
+δt = 1.0 # time step
 niter = 100
 
 # initialize fields
@@ -35,6 +33,22 @@ g11[:] = 1.0 / rcosa[:]
 g22[:] = 1.0
 gac[:] = rcosa[:]
 
+uvel = np.zeros((mesh.num_vertices, 2))
+u0 = 60000.0
+flow_angle = np.deg2rad(0.0)  # radians
+
+cosb = np.cos(flow_angle)
+sinb = np.sin(flow_angle)
+uvel[:,0] = u0 * (cosb*rcosa[:] + rsina[:]*np.cos(mesh.xyrad[:,0])*sinb)
+uvel[:,1] = - u0 * np.sin(mesh.xyrad[:,0]) * sinb
+
+vel = np.zeros((mesh.num_vertices, 2))
+vel[:,0] = uvel[:,0]*g11[:]*gac[:]
+vel[:,1] = uvel[:,1]*g22[:]*gac[:]
+
+# advector in edges
+vel_edges = np.zeros((mesh.num_edges, 2))
+advector_in_edges(mesh, vel_nodes=vel, vel_edges=vel_edges)
 
 for v in range(0, mesh.num_vertices):
     rel_distance_from_origin = np.linalg.norm((mesh.xyarc[v, :]-origin))/np.linalg.norm(extent)
@@ -51,7 +65,7 @@ p.show(cpos="xy", interactive_update=True, auto_close=False) # non-blocking
 #p.show(cpos="xy") # blocking
 
 for i in range(niter):
-    fvm_advect(mesh, rho, vel=vel, δt=δt)
+    fvm_advect(mesh, rho, gac, vel=vel_edges, δt=δt)
 
     # todo: fix
     ds["vertices"].point_data["rho"] = rho
