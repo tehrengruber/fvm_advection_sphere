@@ -32,6 +32,11 @@ elif mesh_type == "serialized":
 else:
     raise ValueError()
 
+#print("num_vertices:", mesh.num_vertices)
+#print("num_edges:", mesh.num_edges)
+#print("num_pole_edges:", mesh.num_pole_edges)
+#print("pole_edges:", mesh.pole_edges[:])
+
 # parameters
 δt = 1.0 # time step
 niter = 100
@@ -66,7 +71,7 @@ vel[:,1] = uvel[:,1]*g22[:]*gac[:]
 
 # advector in edges
 vel_edges = np.zeros((mesh.num_edges, 2))
-advector_in_edges(mesh, vel_nodes=vel, vel_edges=vel_edges)
+advector_in_edges(mesh, vel_vertices=vel, vel_edges=vel_edges)
 
 for v in range(0, mesh.num_vertices):
     rel_distance_from_origin = np.linalg.norm((mesh.xyarc[v, :]-origin))/np.linalg.norm(extent)

@@ -31,10 +31,14 @@ def fvm_advect(
 def advector_in_edges(
     mesh,
     *,
-    vel_nodes,
+    vel_vertices,
     vel_edges):
 
     for e in range(0, mesh.num_edges):
         v1, v2 = mesh.e2v[e,:]
-        vel_edges[e,0] = 0.5 * (vel_nodes[v1,0] + mesh.pole_bc[e]*vel_nodes[v2,0])
-        vel_edges[e,1] = 0.5 * (vel_nodes[v1,1] + mesh.pole_bc[e]*vel_nodes[v2,1])
+        vel_edges[e,0] = 0.5 * (vel_vertices[v1,0] + mesh.pole_bc[e]*vel_vertices[v2,0])
+        vel_edges[e,1] = 0.5 * (vel_vertices[v1,1] + mesh.pole_bc[e]*vel_vertices[v2,1])
+
+    for ep in range(0, mesh.num_pole_edges):
+        e = mesh.pole_edges[ep]
+        vel_edges[e,1] = 0.0
