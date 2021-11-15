@@ -38,8 +38,8 @@ else:
 #print("pole_edges:", mesh.pole_edges[:])
 
 # parameters
-δt = 1.0 # time step
-niter = 100
+δt = 3600.0 # time step in s
+niter = 200
 
 # initialize fields
 rho = np.zeros(mesh.num_vertices)
@@ -57,7 +57,7 @@ g22[:] = 1.0
 gac[:] = rcosa[:]
 
 uvel = np.zeros((mesh.num_vertices, 2))
-u0 = 60000.0
+u0 = 30.0 # m/s
 flow_angle = np.deg2rad(0.0)  # radians
 
 cosb = np.cos(flow_angle)
