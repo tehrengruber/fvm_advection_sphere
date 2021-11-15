@@ -38,8 +38,8 @@ else:
 #print("pole_edges:", mesh.pole_edges[:])
 
 # parameters
-δt = 1.0 # time step
-niter = 100
+δt = 1.0    # time step
+niter = 100  # number of timesteps
 
 # initialize fields
 rho = np.zeros(mesh.num_vertices)
@@ -70,8 +70,7 @@ vel[:,0] = uvel[:,0]*g11[:]*gac[:]
 vel[:,1] = uvel[:,1]*g22[:]*gac[:]
 
 # advector in edges
-vel_edges = np.zeros((mesh.num_edges, 2))
-advector_in_edges(mesh, vel_vertices=vel, vel_edges=vel_edges)
+vel_edges = advector_in_edges(mesh, vel)
 
 for v in range(0, mesh.num_vertices):
     rel_distance_from_origin = np.linalg.norm((mesh.xyarc[v, :]-origin))/np.linalg.norm(extent)
@@ -80,15 +79,16 @@ for v in range(0, mesh.num_vertices):
 
 vis.start_pyvista()
 
+#c2v = mesh.c2v[np.invert(mesh.cflags_periodic)] # fixes visualization with regular mesh
 c2v = mesh.c2v
-ds = vis.make_dataset_from_arrays(mesh.xyarc, edges=mesh.e2v, cells=c2v, vertex_fields={"rho": rho})
+ds = vis.make_dataset_from_arrays(mesh.xyarc, edges=mesh.e2v, cells=c2v, vertex_fields={"rho": rho}) # use mesh.xyz for vis on the sphere
 
 p = vis.plot_mesh(ds, interpolate_before_map=True)
 p.show(cpos="xy", interactive_update=True, auto_close=False) # non-blocking
 #p.show(cpos="xy") # blocking
 
 for i in range(niter):
-    fvm_advect(mesh, rho, gac, vel=vel_edges, δt=δt)
+    rho = fvm_advect(mesh, rho, gac, vel_edges, δt=δt)
 
     # todo: fix
     ds["vertices"].point_data["rho"] = rho

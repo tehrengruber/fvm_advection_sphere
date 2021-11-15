@@ -15,6 +15,7 @@ from atlas4py import (
     build_node_to_cell_connectivity,
     build_element_to_edge_connectivity,
     build_median_dual_mesh,
+    build_periodic_boundaries,
     BlockConnectivity,
 )
 
@@ -72,6 +73,7 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
     build_node_to_edge_connectivity(mesh)
     build_node_to_cell_connectivity(mesh)
     build_median_dual_mesh(mesh)
+    #build_periodic_boundaries(mesh)
 
     num_cells = mesh.cells.size
     num_edges = mesh.edges.size
@@ -103,6 +105,8 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
     xydeg = np.array(mesh.nodes.lonlat, copy=False)
     xyrad = np.array(mesh.nodes.lonlat, copy=False) * deg2rad
     xyarc = np.array(mesh.nodes.lonlat, copy=False) * deg2rad * radius
+    phi, theta = xyrad[:, 1], xyrad[:, 0]
+    xyz = np.stack((np.cos(phi) * np.cos(theta), np.cos(phi) * np.sin(theta), np.sin(phi)), axis=1)
 
     # face orientation
     edges_per_node = mesh.nodes.edge_connectivity.maxcols
@@ -162,9 +166,8 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
         xydeg=xydeg,
         xyrad=xyrad,
         xyarc=xyarc,
+        xyz=xyz,
         vol=vol,
         dual_face_normal_weighted=dual_face_normal_weighted,
         dual_face_orientation=dual_face_orientation
     )
-
-mesh = setup_mesh()
