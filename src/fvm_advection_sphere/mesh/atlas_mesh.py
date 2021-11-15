@@ -64,10 +64,11 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
         config = Config()
         config["triangulate"] = True
         config["angle"] = 20.0
+        config["pole_edges"] = True
 
     # generate mesh from grid points
     mesh = StructuredMeshGenerator(config).generate(grid)
-    build_edges(mesh)
+    build_edges(mesh, config)
     build_node_to_edge_connectivity(mesh)
     build_node_to_cell_connectivity(mesh)
     build_median_dual_mesh(mesh)
