@@ -111,10 +111,20 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
     def is_pole_edge(e):
         return Topology.check(edge_flags[e], Topology.POLE)
 
+    num_pole_edges = 0
     pole_bc = np.ones(num_edges)
     for e in range(0, num_edges):
         if is_pole_edge(e):
+            num_pole_edges += 1
             pole_bc[e] = -1.0
+
+    pole_edges = np.zeros(num_pole_edges, dtype=np.int32)
+    inum_pole_edge = -1 
+    for e in range(0, num_edges):
+        if is_pole_edge(e):
+            inum_pole_edge += 1
+            pole_edges[inum_pole_edge] = e
+
 
     for v in range(0, num_vertices):
         for e_nb in range(0, edges_per_node):
@@ -135,6 +145,7 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
     return SimpleNamespace(
         num_vertices=num_vertices,
         num_edges=num_edges,
+        num_pole_edges=num_pole_edges,
         # connectivities
         c2v=c2v,
         c2e=c2e,
@@ -142,6 +153,7 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
         e2v=e2v,
         e2c=e2c,
         # poles
+        pole_edges=pole_edges,
         pole_bc=pole_bc,
         # flags
         vertex_flags=vertex_flags,
