@@ -67,7 +67,7 @@ for jv in range(0, mesh.num_vertices):
 
 uvel = np.zeros((mesh.num_vertices, 2))
 u0 = 30.0 # m/s
-flow_angle = np.deg2rad(0.0)  # radians
+flow_angle = np.deg2rad(45.0)  # radians
 
 cosb = np.cos(flow_angle)
 sinb = np.sin(flow_angle)
