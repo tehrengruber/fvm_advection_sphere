@@ -163,6 +163,7 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
         # flags
         vertex_flags=vertex_flags,
         # geometry
+        radius=radius,
         xydeg=xydeg,
         xyrad=xyrad,
         xyarc=xyarc,

@@ -56,6 +56,15 @@ g11[:] = 1.0 / rcosa[:]
 g22[:] = 1.0
 gac[:] = rcosa[:]
 
+lonc = 0.5*np.pi
+latc = 0.0
+rho[:] = 0.0
+for jv in range(0, mesh.num_vertices):
+    zdist = mesh.radius*np.arccos(np.sin(latc)*rsina[jv]+np.cos(latc)*rcosa[jv]*np.cos(mesh.xyrad[jv,0]-lonc))
+    rpr = (zdist/(mesh.radius/2))**2
+    rpr = min(1.0, rpr)
+    rho[jv] = 0.5*(1.0+np.cos(np.pi*rpr))
+
 uvel = np.zeros((mesh.num_vertices, 2))
 u0 = 30.0 # m/s
 flow_angle = np.deg2rad(0.0)  # radians
@@ -72,16 +81,12 @@ vel[:,1] = uvel[:,1]*g22[:]*gac[:]
 # advector in edges
 vel_edges = advector_in_edges(mesh, vel)
 
-for v in range(0, mesh.num_vertices):
-    rel_distance_from_origin = np.linalg.norm((mesh.xyarc[v, :]-origin))/np.linalg.norm(extent)
-    if rel_distance_from_origin < 0.2:
-        rho[v] = 1
-
 vis.start_pyvista()
 
 #c2v = mesh.c2v[np.invert(mesh.cflags_periodic)] # fixes visualization with regular mesh
 c2v = mesh.c2v
 ds = vis.make_dataset_from_arrays(mesh.xyarc, edges=mesh.e2v, cells=c2v, vertex_fields={"rho": rho}) # use mesh.xyz for vis on the sphere
+#ds = vis.make_dataset_from_arrays(mesh.xyz, edges=mesh.e2v, cells=c2v, vertex_fields={"rho": rho}) # use mesh.xyz for vis on the sphere
 
 p = vis.plot_mesh(ds, interpolate_before_map=True)
 p.show(cpos="xy", interactive_update=True, auto_close=False) # non-blocking
