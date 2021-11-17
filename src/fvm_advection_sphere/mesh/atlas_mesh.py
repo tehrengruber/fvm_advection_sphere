@@ -69,11 +69,11 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
 
     # generate mesh from grid points
     mesh = StructuredMeshGenerator(config).generate(grid)
+    build_periodic_boundaries(mesh)
     build_edges(mesh, config)
+    build_median_dual_mesh(mesh)
     build_node_to_edge_connectivity(mesh)
     build_node_to_cell_connectivity(mesh)
-    build_median_dual_mesh(mesh)
-    #build_periodic_boundaries(mesh)
 
     num_cells = mesh.cells.size
     num_edges = mesh.edges.size
