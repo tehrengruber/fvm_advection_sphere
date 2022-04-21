@@ -156,3 +156,6 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# vtk can be removed again in the future
+vtk_build
