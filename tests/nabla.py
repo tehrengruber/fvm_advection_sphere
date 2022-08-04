@@ -26,11 +26,11 @@ def nabla(mesh, pp):
 
     return pnabla_MXX, pnabla_MYY
 
-from fvm_advection_sphere.utils.fvm_mesh import FVMMesh
+from fvm_advection_sphere.utils.atlas_mesh import setup_mesh
 import math
 
 def setup_nabla():
-    mesh = FVMMesh()
+    mesh = setup_mesh()
 
     klevel = 0
     MXX = 0

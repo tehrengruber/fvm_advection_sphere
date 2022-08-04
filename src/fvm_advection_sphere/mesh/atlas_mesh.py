@@ -16,6 +16,8 @@ from atlas4py import (
     build_element_to_edge_connectivity,
     build_median_dual_mesh,
     build_periodic_boundaries,
+    build_halo,
+    build_parallel_fields,
     BlockConnectivity,
 )
 
@@ -60,28 +62,55 @@ def _atlas_connectivity_to_numpy(atlas_conn, *, out=None, skip_neighbor_indicato
 
     return out
 
-def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
-    if config is None:
-        config = Config()
-        config["triangulate"] = True
-        config["angle"] = 20.0
-        config["pole_edges"] = True
-
-    # generate mesh from grid points
+def _build_atlas_mesh(config, grid, periodic_halos=None):
+    # compare https://github.com/ckuehnlein/FVM_BESPOKE_NWP/blob/bespoke_nwp/src/fvm/core/datastruct_module.F90#L353
     mesh = StructuredMeshGenerator(config).generate(grid)
-    build_edges(mesh, config)
+
+    # note: regularly the following calls are done implicitly using
+    functionspace.EdgeColumns(mesh, halo=2)
+    functionspace.NodeColumns(mesh, halo=2)
+    #if periodic_halos:
+    #    build_parallel_fields(mesh)
+    #    build_periodic_boundaries(mesh)
+    #    build_halo(mesh, periodic_halos)
+
+    #build_edges(mesh, config)
     build_node_to_edge_connectivity(mesh)
     build_node_to_cell_connectivity(mesh)
     build_median_dual_mesh(mesh)
-    #build_periodic_boundaries(mesh)
+
+    return mesh
+
+
+def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
+    if config is None:
+        config = Config()
+        config["triangulate"] = False
+        config["angle"] = -1.0
+        config["pole_edges"] = True
+
+    # generate mesh from grid points
+    #mesh = _build_atlas_mesh(config, grid)
+    mesh = _build_atlas_mesh(config, grid, periodic_halos=2)
 
     num_cells = mesh.cells.size
     num_edges = mesh.edges.size
     num_vertices = mesh.nodes.size
 
+    # flags
+    vertex_flags = np.array(mesh.nodes.flags(), copy=False)
+    edge_flags = np.array(mesh.edges.flags(), copy=False)
+    cell_flags = np.array(mesh.cells.flags(), copy=False)
+
     #
     # connectivities
-    #
+    v2e = _atlas_connectivity_to_numpy(mesh.nodes.edge_connectivity)[0:num_vertices, :]
+    v2c = _atlas_connectivity_to_numpy(mesh.nodes.cell_connectivity)[0:num_vertices, :]
+    e2v = _atlas_connectivity_to_numpy(mesh.edges.node_connectivity)[0:num_edges, :]
+    e2c = _atlas_connectivity_to_numpy(mesh.edges.cell_connectivity)[0:num_edges, :]
+    c2v = _atlas_connectivity_to_numpy(mesh.cells.node_connectivity)[0:num_cells, :]
+    c2e = _atlas_connectivity_to_numpy(mesh.cells.edge_connectivity)[0:num_cells, :]
+
     v2e = _atlas_connectivity_to_numpy(mesh.nodes.edge_connectivity)
     v2c = _atlas_connectivity_to_numpy(mesh.nodes.cell_connectivity)
     e2v = _atlas_connectivity_to_numpy(mesh.edges.node_connectivity)
@@ -89,15 +118,15 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
     c2v = _atlas_connectivity_to_numpy(mesh.cells.node_connectivity)
     c2e = _atlas_connectivity_to_numpy(mesh.cells.edge_connectivity)
 
+    vertex_remote_indices = np.array(mesh.nodes.field("remote_idx"), copy=False)
+    edge_remote_indices = np.array(mesh.edges.field("remote_idx"), copy=False)
+
     assert v2e.shape[0] == num_vertices
     assert v2c.shape[0] == num_vertices
     assert e2v.shape[0] == num_edges
     assert e2c.shape[0] == num_edges
     assert c2v.shape[0] == num_cells
     assert c2e.shape[0] == num_cells
-
-    # flags
-    vertex_flags = np.array(mesh.nodes.flags(), copy=False)
 
     #
     # geometrical properties
@@ -109,9 +138,8 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
     xyz = np.stack((np.cos(phi) * np.cos(theta), np.cos(phi) * np.sin(theta), np.sin(phi)), axis=1)
 
     # face orientation
-    edges_per_node = mesh.nodes.edge_connectivity.maxcols
-    dual_face_orientation = np.zeros((mesh.nodes.size, edges_per_node)) # formerly known as "sign field"
-    edge_flags = np.array(mesh.edges.flags(), copy=False)
+    edges_per_node = v2e.shape[1]
+    dual_face_orientation = np.zeros((num_vertices, edges_per_node)) # formerly known as "sign field"
 
     def is_pole_edge(e):
         return Topology.check(edge_flags[e], Topology.POLE)
@@ -147,21 +175,26 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
     # dual volume
     vol = np.array(mesh.nodes.field("dual_volumes"), copy=False) * deg2rad**2 * radius**2
 
-    return SimpleNamespace(
+    result = SimpleNamespace(
         num_vertices=num_vertices,
         num_edges=num_edges,
         num_pole_edges=num_pole_edges,
+        num_cells=num_cells,
         # connectivities
         c2v=c2v,
         c2e=c2e,
         v2e=v2e,
+        v2c=v2c,
         e2v=e2v,
         e2c=e2c,
         # poles
         pole_edges=pole_edges,
         pole_bc=pole_bc,
+        edge_remote_indices=edge_remote_indices,
         # flags
         vertex_flags=vertex_flags,
+        edge_flags=edge_flags,
+        cell_flags=cell_flags,
         # geometry
         radius=radius,
         xydeg=xydeg,
@@ -170,5 +203,9 @@ def setup_mesh(grid=StructuredGrid("O32"), radius=6371.22e03, config=None):
         xyz=xyz,
         vol=vol,
         dual_face_normal_weighted=dual_face_normal_weighted,
-        dual_face_orientation=dual_face_orientation
+        dual_face_orientation=dual_face_orientation,
+        # for debugging
+        _atlas_mesh=mesh
     )
+
+    return result

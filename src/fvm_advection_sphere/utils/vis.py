@@ -159,7 +159,7 @@ def start_pyvista(
 ) -> None:
     if jupyter:
         pv.start_xvfb()
-    pv.set_plot_theme(theme)
+    pv.set_plot_theme("paraview")
 
 
 def plot_mesh(
@@ -172,6 +172,8 @@ def plot_mesh(
 ) -> pv.Plotter:
     if plot is None:
         plot = pv.Plotter()
+        #from pyvistaqt import BackgroundPlotter
+        #plot = BackgroundPlotter()
     if title:
         plot.add_text(title, font_size=font_size)
     plot.add_mesh(dataset, **add_mesh_kwargs)
