@@ -199,7 +199,7 @@ for i in range(niter):
     # todo: avoid copy
     ds["vertices"].point_data["rho"] = rho
     ds["vertices_interpolated"].point_data["rho"] = rho
-    p.render()
+    p.update()  # use p.render() otherwise (update sometimes hangs)
     print("ts")
 
 print("Done")
