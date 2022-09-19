@@ -2,6 +2,8 @@ from atlas4py import Topology
 import numpy as np
 import pyvista as pv
 
+from timeit import default_timer as timer
+
 import fvm_advection_sphere.mesh.regular_mesh as regular_mesh
 import fvm_advection_sphere.mesh.atlas_mesh as atlas_mesh
 from fvm_advection_sphere.advection import fvm_advect, advector_in_edges
@@ -9,6 +11,7 @@ from functional.iterator.embedded import NeighborTableOffsetProvider
 
 import fvm_advection_sphere.utils.vis as vis
 from fvm_advection_sphere.common import *
+from fvm_advection_sphere.state import StateContainer
 
 # initialize mesh
 mesh_type = "atlas"  # atlas, atlas_from_file
@@ -58,7 +61,8 @@ print(mesh.info())
 niter = 100
 
 # initialize fields
-rho = np.zeros(mesh.num_vertices)
+state = StateContainer.from_mesh(mesh)
+
 g11 = np.zeros(mesh.num_vertices)
 g22 = np.zeros(mesh.num_vertices)
 gac = np.zeros(mesh.num_vertices)
@@ -76,13 +80,12 @@ gac[:] = rcosa[:]
 #latc = 60/180 * np.pi
 lonc = 0.5 * np.pi
 latc = 0
-rho[:] = 0.0
 for jv in range(0, mesh.num_vertices):
     zdist = mesh.radius * np.arccos(np.sin(latc) * rsina[jv] + np.cos(latc) * rcosa[jv] * np.cos(mesh.xyrad[jv, 0] - lonc))
     rpr = (zdist / (mesh.radius / 2)) ** 2
     rpr = min(1.0, rpr)
     if not mesh.vertex_flags[jv] & Topology.GHOST:
-        rho[jv] = 0.5 * (1.0 + np.cos(np.pi * rpr))
+        np.asarray(state.rho)[jv] = 0.5 * (1.0 + np.cos(np.pi * rpr))
 
 uvel = np.zeros((mesh.num_vertices, 2))
 u0 = 30.0  # m/s
@@ -101,14 +104,20 @@ vel[:,1] = uvel[:,1]*g22[:]*gac[:]
 #vel[:,0] = 30
 #vel[:,1] = 0
 
+offset_provider = {
+    "E2V": mesh.e2v,
+    "V2E": mesh.v2e,
+    "V2VE": mesh.v2ve
+}
+
 # advector in edges
-vel_edges = advector_in_edges(mesh, vel)
+#vel_edges = advector_in_edges(mesh, vel, offset_provider=offset_provider)
 
 vis.start_pyvista()
 
 #c2v = mesh.c2v[np.invert(mesh.cflags_periodic)] # fixes visualization with regular mesh
 c2v = mesh.c2v_np
-ds = vis.make_dataset_from_arrays(mesh.xyarc, edges=mesh.e2v_np, cells=c2v, vertex_fields={"rho": rho}) # use mesh.xyz for vis on the sphere
+ds = vis.make_dataset_from_arrays(mesh.xyarc, edges=mesh.e2v_np, cells=c2v, vertex_fields={"rho": np.asarray(state.rho)}) # use mesh.xyz for vis on the sphere
 #ds = vis.make_dataset_from_arrays(mesh.xyz, edges=mesh.e2v, cells=c2v, vertex_fields={"rho": rho}) # use mesh.xyz for vis on the sphere
 p = vis.plot_mesh(ds, interpolate_before_map=True)
 
@@ -173,11 +182,6 @@ p.show(cpos="xy", interactive_update=True, auto_close=False)  # non-blocking
 #p.render()
 #p.show(cpos="xy") # blocking
 
-offset_provider = {
-    "E2V": mesh.e2v,
-    "V2E": mesh.v2e
-}
-
 def update_periodic_layers(mesh, field: np.ndarray):
     # todo: generalize to other dimensions
     for vertex_id in range(mesh.num_vertices):
@@ -185,16 +189,27 @@ def update_periodic_layers(mesh, field: np.ndarray):
             field[vertex_id] = field[remote_vertex_indices[vertex_id]]
 
 for i in range(niter):
-    rho = fvm_advect(mesh, rho, gac, vel_edges, δt=δt, offset_provider=offset_provider)
+    start = timer()
 
-    update_periodic_layers(mesh, rho)
+    state.rho = fvm_advect(
+        mesh,
+        state.rho,
+        gac,
+        vel,
+        δt=δt,
+        offset_provider=offset_provider
+    )
+
+    update_periodic_layers(mesh, state.rho)
 
     # todo: avoid copy
-    ds["vertices"].point_data["rho"] = rho
-    ds["vertices_interpolated"].point_data["rho"] = rho
+    ds["vertices"].point_data["rho"] = np.asarray(state.rho)
+    ds["vertices_interpolated"].point_data["rho"] = np.asarray(state.rho)
     p.render()
     #p.update()  # use p.render() otherwise (update sometimes hangs)
-    print("ts")
+
+    end = timer()
+    print(f"Timestep {i} ({end - start}s)")
 
 print("Done")
 p.show(cpos="xy")

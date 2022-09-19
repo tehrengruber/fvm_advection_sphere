@@ -21,7 +21,7 @@ from atlas4py import (
     BlockConnectivity,
 )
 
-from fvm_advection_sphere.common import dtype, Cell, Edge, Vertex, K, V2EDim
+from fvm_advection_sphere.common import dtype, Cell, Edge, Vertex, K, V2EDim, VertexEdgeNb, V2VEDim, V2VE
 
 from functional.common import Field, Connectivity
 from functional.iterator.embedded import NeighborTableOffsetProvider, np_as_located_field
@@ -89,6 +89,7 @@ class AtlasMesh:
     v2c: Connectivity
     e2v: Connectivity
     e2c: Connectivity
+    v2ve: Connectivity
 
     c2v_np: np.ndarray
     c2e_np: np.ndarray
@@ -99,7 +100,8 @@ class AtlasMesh:
 
     # poles
     pole_edges: np.ndarray  # list of all pole edges
-    pole_bc: Field[[Edge], bool]
+    pole_edge_mask: Field[[Edge], bool]
+    pole_bc: Field[[Edge], dtype]
 
     # remote indices: for each geometric entity it's remote index
     vertex_remote_indices: np.ndarray
@@ -126,6 +128,7 @@ class AtlasMesh:
     dual_face_normal_weighted_np: np.ndarray
 
     dual_face_orientation: Field[[Edge], dtype]
+    dual_face_orientation_flat: Field[[VertexEdgeNb], dtype]
     dual_face_orientation_np: np.ndarray
 
     _atlas_mesh: Any  # for debugging
@@ -184,6 +187,8 @@ class AtlasMesh:
         e2c = NeighborTableOffsetProvider(e2c_np, Edge, Cell, e2c_np.shape[1])
         c2v = NeighborTableOffsetProvider(c2v_np, Cell, Vertex, c2v_np.shape[1])
         c2e = NeighborTableOffsetProvider(c2e_np, Cell, Edge, c2e_np.shape[1])
+        v2ve = NeighborTableOffsetProvider(np.reshape(np.arange(0, num_vertices*v2e.max_neighbors, 1), (num_vertices, v2e.max_neighbors)),
+                                           Vertex, VertexEdgeNb, v2e.max_neighbors)
 
         vertex_remote_indices = np.array(mesh.nodes.field("remote_idx"),
                                          copy=False)
@@ -212,11 +217,15 @@ class AtlasMesh:
             return Topology.check(edge_flags[e], Topology.POLE)
 
         num_pole_edges = 0
-        pole_bc = np.ones(num_edges)
+        pole_edge_mask_np = np.zeros(num_edges, dtype=bool)
+        pole_bc_np = np.ones(num_edges)
         for e in range(0, num_edges):
             if is_pole_edge(e):
                 num_pole_edges += 1
-                pole_bc[e] = -1.0
+                pole_bc_np[e] = -1.0
+                pole_edge_mask_np[e] = True
+        pole_edge_mask = np_as_located_field(Edge)(pole_edge_mask_np)
+        pole_bc = np_as_located_field(Edge)(pole_bc_np)
 
         pole_edges = np.zeros(num_pole_edges, dtype=np.int32)
         inum_pole_edge = -1
@@ -225,6 +234,7 @@ class AtlasMesh:
                 inum_pole_edge += 1
                 pole_edges[inum_pole_edge] = e
 
+        dual_face_orientation_flat = np.zeros(num_vertices * edges_per_node)
         for v in range(0, num_vertices):
             for e_nb in range(0, edges_per_node):
                 e = v2e_np[v, e_nb]
@@ -234,7 +244,9 @@ class AtlasMesh:
                     dual_face_orientation_np[v, e_nb] = -1.0
                     if is_pole_edge(e):
                         dual_face_orientation_np[v, e_nb] = 1.0
+                dual_face_orientation_flat[edges_per_node*v+e_nb] = dual_face_orientation_np[v, e_nb]
         dual_face_orientation = np_as_located_field(Vertex, V2EDim)(dual_face_orientation_np)
+        dual_face_orientation_flat = np_as_located_field(VertexEdgeNb)(dual_face_orientation_flat)
 
         # dual normal
         dual_face_normal_weighted_np = np.array(mesh.edges.field("dual_normals"),
@@ -262,8 +274,10 @@ class AtlasMesh:
             v2c=v2c, v2c_np=v2c_np,
             e2v=e2v, e2v_np=e2v_np,
             e2c=e2c, e2c_np=e2c_np,
+            v2ve=v2ve,
 
             # poles
+            pole_edge_mask=pole_edge_mask,
             pole_edges=pole_edges,
             pole_bc=pole_bc,
 
@@ -292,6 +306,7 @@ class AtlasMesh:
 
             dual_face_orientation_np=dual_face_orientation_np,
             dual_face_orientation=dual_face_orientation,
+            dual_face_orientation_flat=dual_face_orientation_flat,
 
             # for debugging
             _atlas_mesh=mesh
