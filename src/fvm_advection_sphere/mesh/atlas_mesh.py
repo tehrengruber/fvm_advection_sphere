@@ -23,17 +23,22 @@ from atlas4py import (
 
 from fvm_advection_sphere.common import dtype, Cell, Edge, Vertex, K, V2EDim, VertexEdgeNb, V2VEDim, V2VE
 
-from functional.common import Field, Connectivity
+from functional.common import Dimension, Field, Connectivity, DimensionKind
 from functional.iterator.embedded import NeighborTableOffsetProvider, np_as_located_field
 
 rpi: Final[float] = 2.0 * math.asin(1.0)
 deg2rad: Final[float] = 2.0 * rpi / 360.0
 
+DIMENSION_TO_SIZE_ATTR: dict[Dimension, str] = {
+    Vertex: "num_vertices",
+    Edge: "num_edges",
+    Cell: "num_cells"
+}
 
 def _atlas_connectivity_to_numpy(atlas_conn, *, out=None, skip_neighbor_indicator=-1):
     if isinstance(atlas_conn, BlockConnectivity):
         shape = (atlas_conn.rows, atlas_conn.cols)
-        out = np.zeros(shape, dtype=np.int64) if out is None else out
+        out = np.zeros(shape, dtype=np.int32) if out is None else out
         assert out.shape == shape
 
         for i in range(atlas_conn.rows):
@@ -43,7 +48,7 @@ def _atlas_connectivity_to_numpy(atlas_conn, *, out=None, skip_neighbor_indicato
         return out
 
     shape = (atlas_conn.rows, atlas_conn.maxcols)
-    out = np.zeros(shape, dtype=np.int64) if out is None else out
+    out = np.zeros(shape, dtype=np.int32) if out is None else out
     assert out.shape == shape
 
     for i in range(atlas_conn.rows):
@@ -101,12 +106,10 @@ class AtlasMesh:
     # poles
     pole_edges: np.ndarray  # list of all pole edges
     pole_edge_mask: Field[[Edge], bool]
-    pole_bc: Field[[Edge], dtype]
+    pole_edge_mask_np: np.ndarray
 
     # remote indices: for each geometric entity it's remote index
-    vertex_remote_indices: np.ndarray
-    edge_remote_indices: np.ndarray
-    cell_remote_indices: np.ndarray
+    remote_indices: dict[Dimension, np.ndarray]
 
     # flags
     vertex_flags: np.ndarray
@@ -187,7 +190,7 @@ class AtlasMesh:
         e2c = NeighborTableOffsetProvider(e2c_np, Edge, Cell, e2c_np.shape[1])
         c2v = NeighborTableOffsetProvider(c2v_np, Cell, Vertex, c2v_np.shape[1])
         c2e = NeighborTableOffsetProvider(c2e_np, Cell, Edge, c2e_np.shape[1])
-        v2ve = NeighborTableOffsetProvider(np.reshape(np.arange(0, num_vertices*v2e.max_neighbors, 1), (num_vertices, v2e.max_neighbors)),
+        v2ve = NeighborTableOffsetProvider(np.reshape(np.arange(0, num_vertices*v2e.max_neighbors, 1, dtype=np.int32), (num_vertices, v2e.max_neighbors)),
                                            Vertex, VertexEdgeNb, v2e.max_neighbors)
 
         vertex_remote_indices = np.array(mesh.nodes.field("remote_idx"),
@@ -218,14 +221,11 @@ class AtlasMesh:
 
         num_pole_edges = 0
         pole_edge_mask_np = np.zeros(num_edges, dtype=bool)
-        pole_bc_np = np.ones(num_edges)
         for e in range(0, num_edges):
             if is_pole_edge(e):
                 num_pole_edges += 1
-                pole_bc_np[e] = -1.0
                 pole_edge_mask_np[e] = True
         pole_edge_mask = np_as_located_field(Edge)(pole_edge_mask_np)
-        pole_bc = np_as_located_field(Edge)(pole_bc_np)
 
         pole_edges = np.zeros(num_pole_edges, dtype=np.int32)
         inum_pole_edge = -1
@@ -277,13 +277,14 @@ class AtlasMesh:
             v2ve=v2ve,
 
             # poles
-            pole_edge_mask=pole_edge_mask,
+            pole_edge_mask=pole_edge_mask, pole_edge_mask_np=pole_edge_mask_np,
             pole_edges=pole_edges,
-            pole_bc=pole_bc,
 
-            vertex_remote_indices=vertex_remote_indices,
-            edge_remote_indices=edge_remote_indices,
-            cell_remote_indices=cell_remote_indices,
+            remote_indices = {
+                Vertex: vertex_remote_indices,
+                Edge: edge_remote_indices,
+                Cell: cell_remote_indices
+            },
 
             # flags
             vertex_flags=vertex_flags,
@@ -311,3 +312,12 @@ class AtlasMesh:
             # for debugging
             _atlas_mesh=mesh
         )
+def update_periodic_layers(mesh: AtlasMesh, field: Field):
+    # todo: generalize to other dimensions
+    horizontal_dimension = field.axes[0]
+    assert horizontal_dimension.kind == DimensionKind.HORIZONTAL
+    remote_indices = mesh.remote_indices[horizontal_dimension]
+
+    for hid in range(getattr(mesh, DIMENSION_TO_SIZE_ATTR[horizontal_dimension])):
+        if remote_indices[hid] != hid:
+            field[hid] = field[remote_indices[hid]]

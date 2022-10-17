@@ -5,7 +5,7 @@ import pyvista as pv
 from timeit import default_timer as timer
 
 import fvm_advection_sphere.mesh.regular_mesh as regular_mesh
-import fvm_advection_sphere.mesh.atlas_mesh as atlas_mesh
+from fvm_advection_sphere.mesh.atlas_mesh import AtlasMesh, update_periodic_layers
 from fvm_advection_sphere.advection import fvm_advect, advector_in_edges
 from functional.iterator.embedded import NeighborTableOffsetProvider
 
@@ -24,8 +24,8 @@ if mesh_type == "regular":
 elif mesh_type == "atlas":
     # atlas mesh
     from atlas4py import StructuredGrid
-    grid = StructuredGrid("O8")
-    mesh = atlas_mesh.AtlasMesh.generate(grid)
+    grid = StructuredGrid("O50")
+    mesh = AtlasMesh.generate(grid)
 
     if False:
         import copy
@@ -58,7 +58,7 @@ print(mesh.info())
 
 # parameters
 δt = 3600.0  # time step in s
-niter = 100
+niter = 1000
 
 # initialize fields
 state = StateContainer.from_mesh(mesh)
@@ -85,10 +85,36 @@ for jv in range(0, mesh.num_vertices):
     rpr = (zdist / (mesh.radius / 2)) ** 2
     rpr = min(1.0, rpr)
     if not mesh.vertex_flags[jv] & Topology.GHOST:
-        np.asarray(state.rho)[jv] = 0.5 * (1.0 + np.cos(np.pi * rpr))
+        state.rho[jv] = 0.5 * (1.0 + np.cos(np.pi * rpr))
+
+from functional.ffront.fbuiltins import arccos, sin, cos, where, minimum
+@field_operator
+def intial_rho(
+    mesh_radius: float,
+    mesh_xydeg_x: Field[[Vertex], float],
+    mesh_xydeg_y: Field[[Vertex], float],
+    vertex_ghost_mask: Field[[Vertex], float]
+) -> Field[[Vertex], float]:
+    PI = 3.141592653589793
+    DEG2RAD = 2.0 * PI / 360.0
+    lonc = 0.5 * PI
+    latc = 0.
+
+    rsina = sin(mesh_xyrad_y)
+    rcosa = cos(mesh_xyrad_y)
+
+    xyrad_x = mesh_xydeg * DEG2RAD
+    xyrad_x = mesh_xydeg * DEG2RAD
+
+    zdist = mesh_radius * arccos(sin(latc) * rsina + cos(latc) * rcosa * cos(xyrad_x - lonc))
+    rpr = (zdist / (mesh_radius / 2)) ** 2
+    rpr = minimum(1.0, rpr)
+    return where(vertex_ghost_mask, 0., 0.5 * (1.0 + cos(PI * rpr)))
+
+#initial_rho(mesh.radius, mesh.xyrad)
 
 uvel = np.zeros((mesh.num_vertices, 2))
-u0 = 30.0  # m/s
+u0 = -30.0  # m/s
 flow_angle = np.deg2rad(45.0)  # radians
 
 
@@ -97,9 +123,8 @@ sinb = np.sin(flow_angle)
 uvel[:, 0] = u0 * (cosb * rcosa[:] + rsina[:] * np.cos(mesh.xyrad[:, 0]) * sinb)
 uvel[:, 1] = - u0 * np.sin(mesh.xyrad[:, 0]) * sinb
 
-vel = np.zeros((mesh.num_vertices, 2))
-vel[:,0] = uvel[:,0]*g11[:]*gac[:]
-vel[:,1] = uvel[:,1]*g22[:]*gac[:]
+state.vel_x[:] = uvel[:,0]*g11[:]*gac[:]
+state.vel_y[:] = uvel[:,1]*g22[:]*gac[:]
 
 #vel[:,0] = 30
 #vel[:,1] = 0
@@ -124,9 +149,8 @@ p = vis.plot_mesh(ds, interpolate_before_map=True)
 #
 # vertices
 #
-ds["vertices"]["indices"]= [f"v{idx}" for idx in range(mesh.num_vertices)]
-remote_vertex_indices = np.asarray(mesh._atlas_mesh.nodes.field("remote_idx"))
-ds["vertices"]["remote_indices"] = [f"v{idx}, {remote_idx}" for (idx, remote_idx) in zip(range(mesh.num_vertices), remote_vertex_indices)]
+ds["vertices"]["indices"] = [f"v{idx}" for idx in range(mesh.num_vertices)]
+ds["vertices"]["remote_indices"] = [f"v{idx}, {remote_idx}" for (idx, remote_idx) in zip(range(mesh.num_vertices), mesh.remote_indices[Vertex])]
 ds["vertices"]["periodic_vertices"] = [f"{i}" for i in (mesh.vertex_flags&Topology.BC).astype(np.bool).astype(np.int)]
 ds["vertices"]["conn_v2e"] = [f"{mesh.v2e_np[i, :]}" for i in range(mesh.num_vertices)]
 ds["vertices"]["conn_v2c"] = [f"{mesh.v2c_np[i, :]}" for i in range(mesh.num_vertices)]
@@ -148,12 +172,10 @@ def compute_edge_centers(mesh):
         ),
         axis=1,
     )
-edge_center_indices, edge_centers = compute_edge_centers(mesh)  #
-#remote_edge_indices = np.asarray(mesh._atlas_mesh.edges.field("remote_idx"))
-remote_edge_indices = mesh.edge_remote_indices
+edge_center_indices, edge_centers = compute_edge_centers(mesh)
 ds["edge_centers"] = pv.PolyData(edge_centers)
 ds["edge_centers"]["indices"] = [f"e{i}" for i in edge_center_indices]
-ds["edge_centers"]["remote_indices"] = [f"e{i}, {remote_edge_indices[i]}" for i in edge_center_indices]
+ds["edge_centers"]["remote_indices"] = [f"e{i}, {mesh.remote_indices[Edge][i]}" for i in edge_center_indices]
 
 #
 # cells
@@ -182,12 +204,6 @@ p.show(cpos="xy", interactive_update=True, auto_close=False)  # non-blocking
 #p.render()
 #p.show(cpos="xy") # blocking
 
-def update_periodic_layers(mesh, field: np.ndarray):
-    # todo: generalize to other dimensions
-    for vertex_id in range(mesh.num_vertices):
-        if remote_vertex_indices[vertex_id] != vertex_id:
-            field[vertex_id] = field[remote_vertex_indices[vertex_id]]
-
 for i in range(niter):
     start = timer()
 
@@ -195,18 +211,21 @@ for i in range(niter):
         mesh,
         state.rho,
         gac,
-        vel,
+        (state.vel_x, state.vel_y),
         δt=δt,
         offset_provider=offset_provider
     )
 
     update_periodic_layers(mesh, state.rho)
 
+    start_plotting = timer()
     # todo: avoid copy
     ds["vertices"].point_data["rho"] = np.asarray(state.rho)
     ds["vertices_interpolated"].point_data["rho"] = np.asarray(state.rho)
     p.render()
     #p.update()  # use p.render() otherwise (update sometimes hangs)
+    end_plotting = timer()
+    print(f"Plotting {i} ({end_plotting - start_plotting}s)")
 
     end = timer()
     print(f"Timestep {i} ({end - start}s)")
