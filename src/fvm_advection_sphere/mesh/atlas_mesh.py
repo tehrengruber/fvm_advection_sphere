@@ -21,7 +21,7 @@ from atlas4py import (
     BlockConnectivity,
 )
 
-from fvm_advection_sphere.common import dtype, Cell, Edge, Vertex, K, V2EDim, VertexEdgeNb, V2VEDim, V2VE
+from fvm_advection_sphere.common import dtype, Cell, Edge, Vertex, K, V2EDim, VertexEdgeNb, E2VDim
 
 from functional.common import Dimension, Field, Connectivity, DimensionKind
 from functional.iterator.embedded import NeighborTableOffsetProvider, np_as_located_field
@@ -116,9 +116,13 @@ class AtlasMesh:
     edge_flags: np.ndarray
     cell_flags: np.ndarray
 
+    vertex_ghost_mask: Field[[Vertex], bool]
+
     # geometry
     radius: dtype
-    xydeg: np.ndarray
+    xydeg_x: Field[[Vertex], dtype]
+    xydeg_y: Field[[Vertex], dtype]
+    xydeg_np: np.ndarray
     xyrad: np.ndarray
     xyarc: np.ndarray
     xyz: np.ndarray
@@ -130,9 +134,13 @@ class AtlasMesh:
     dual_face_normal_weighted_y: Field[[Edge], dtype]
     dual_face_normal_weighted_np: np.ndarray
 
-    dual_face_orientation: Field[[Edge], dtype]
+    dual_face_orientation: Field[[Vertex, V2EDim], dtype]
     dual_face_orientation_flat: Field[[VertexEdgeNb], dtype]
     dual_face_orientation_np: np.ndarray
+
+    offset_provider: dict[str, Connectivity | Dimension]
+
+    grid_description: str  # string representation of the atlas grid instance
 
     _atlas_mesh: Any  # for debugging
 
@@ -141,7 +149,7 @@ class AtlasMesh:
 
         return textwrap.dedent(f"""
         Atlas mesh
-          grid:     {str(self._atlas_mesh.grid)}
+          grid:     {self.grid_description}
           vertices: {str(self.num_vertices).rjust(n)}
           edges:    {str(self.num_edges).rjust(n)}
           cells:    {str(self.num_cells).rjust(n)}
@@ -167,6 +175,8 @@ class AtlasMesh:
         vertex_flags = np.array(mesh.nodes.flags(), copy=False)
         edge_flags = np.array(mesh.edges.flags(), copy=False)
         cell_flags = np.array(mesh.cells.flags(), copy=False)
+
+        vertex_ghost_mask = np_as_located_field(Vertex)((vertex_flags & Topology.GHOST).astype(bool))
 
         #
         # connectivities
@@ -203,7 +213,9 @@ class AtlasMesh:
         #
         # geometrical properties
         #
-        xydeg = np.array(mesh.nodes.lonlat, copy=False)
+        xydeg_np = np.array(mesh.nodes.lonlat, copy=False)
+        xydeg_x = np_as_located_field(Vertex)(xydeg_np[:, 0])
+        xydeg_y = np_as_located_field(Vertex)(xydeg_np[:, 1])
         xyrad = np.array(mesh.nodes.lonlat, copy=False) * deg2rad
         xyarc = np.array(mesh.nodes.lonlat, copy=False) * deg2rad * radius
         phi, theta = xyrad[:, 1], xyrad[:, 0]
@@ -261,6 +273,14 @@ class AtlasMesh:
                        copy=False) * deg2rad ** 2 * radius ** 2
         vol = np_as_located_field(Vertex)(vol_np)
 
+        # offset provider
+        offset_provider = {
+            "E2V": e2v,
+            "V2E": v2e,
+            "V2EDim": V2EDim,
+            "E2VDim": E2VDim
+        }
+
         return cls(
             num_vertices=num_vertices,
             num_edges=num_edges,
@@ -291,9 +311,11 @@ class AtlasMesh:
             edge_flags=edge_flags,
             cell_flags=cell_flags,
 
+            vertex_ghost_mask=vertex_ghost_mask,
+
             # geometry
             radius=radius,
-            xydeg=xydeg,
+            xydeg_x=xydeg_x, xydeg_y=xydeg_y, xydeg_np=xydeg_np,
             xyrad=xyrad,
             xyarc=xyarc,
             xyz=xyz,
@@ -308,6 +330,10 @@ class AtlasMesh:
             dual_face_orientation_np=dual_face_orientation_np,
             dual_face_orientation=dual_face_orientation,
             dual_face_orientation_flat=dual_face_orientation_flat,
+
+            offset_provider=offset_provider,
+
+            grid_description = str(grid),
 
             # for debugging
             _atlas_mesh=mesh

@@ -1,7 +1,8 @@
 import numpy as np
+from fvm_advection_sphere.mesh.atlas_mesh import AtlasMesh
 
 def upstream_flux(
-    mesh,
+    mesh: AtlasMesh,
     rho: np.ndarray,    # field on vertices
     vel: np.ndarray     # 2d-vector on edges
 ) -> np.ndarray:
@@ -22,7 +23,7 @@ def upstream_flux(
     return flux
 
 def fluxdiv_np(
-    mesh,
+    mesh: AtlasMesh,
     rho: np.ndarray,    # field on vertices
     gac: np.ndarray,    # field on vertices
     flux: np.ndarray,   # field on edges
@@ -36,12 +37,29 @@ def fluxdiv_np(
     return rho_next
 
 def fvm_advect_np(
-        mesh,
-        rho: np.ndarray,  # field on vertices
-        gac: np.ndarray,  # field on vertices
-        vel: np.ndarray,  # 2d-vector on edges
-        *,
-        δt: float,
+    mesh: AtlasMesh,
+    rho: np.ndarray,  # field on vertices
+    gac: np.ndarray,  # field on vertices
+    vel: np.ndarray,  # 2d-vector on edges
+    *,
+    δt: float,
 ):
     flux = upstream_flux(mesh, rho, vel)
     return fluxdiv_np(mesh, rho, gac, flux, δt=δt)
+
+
+def advector_in_edges_np(
+    mesh: AtlasMesh,
+    vel_vertices,
+):
+    vel_edges = np.zeros((mesh.num_edges, 2))
+
+    for e in range(0, mesh.num_edges):
+        v1, v2 = mesh.e2v_np[e,:]
+        vel_edges[e,0] = 0.5 * (vel_vertices[v1,0] + mesh.pole_bc[e]*vel_vertices[v2,0])
+        vel_edges[e,1] = 0.5 * (vel_vertices[v1,1] + mesh.pole_bc[e]*vel_vertices[v2,1])
+
+    for e in mesh.pole_edges:
+        vel_edges[e,1] = 0.0
+
+    return vel_edges

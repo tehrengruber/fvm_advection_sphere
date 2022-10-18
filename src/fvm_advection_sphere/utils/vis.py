@@ -57,24 +57,24 @@ def make_dataset_from_arrays(
 
     # Create a dataset with a different block per primitive
     blocks = pv.MultiBlock()
-    blocks["cells"] = pv.PolyData(prepared_points, prepared_cells)
-    cell_fields = cell_fields or {}
-    for field_name in cell_fields:
-        blocks["cells"].cell_data[field_name] = cell_fields[field_name]
+    #blocks["cells"] = pv.PolyData(prepared_points, prepared_cells)
+    #cell_fields = cell_fields or {}
+    #for field_name in cell_fields:
+    #    blocks["cells"].cell_data[field_name] = cell_fields[field_name]
 
-    blocks["edges"] = pv.PolyData(prepared_points, lines=prepared_edges)
-    edge_fields = edge_fields or {}
-    for field_name in edge_fields:
-        blocks["edges"].cell_data[field_name] = edge_fields[field_name]
+    #blocks["edges"] = pv.PolyData(prepared_points, lines=prepared_edges)
+    #edge_fields = edge_fields or {}
+    #for field_name in edge_fields:
+    #    blocks["edges"].cell_data[field_name] = edge_fields[field_name]
+
+    blocks["vertices_interpolated"] = pv.PolyData(prepared_points, prepared_cells, lines=prepared_edges)
+    for field_name in vertex_fields:
+        blocks["vertices_interpolated"].point_data[field_name] = vertex_fields[field_name]
 
     blocks["vertices"] = pv.PolyData(prepared_points)
     vertex_fields = vertex_fields or {}
     for field_name in vertex_fields:
         blocks["vertices"].point_data[field_name] = vertex_fields[field_name]
-
-    blocks["vertices_interpolated"] = pv.PolyData(prepared_points, prepared_cells)
-    for field_name in vertex_fields:
-        blocks["vertices_interpolated"].point_data[field_name] = vertex_fields[field_name]
 
     return blocks
 
