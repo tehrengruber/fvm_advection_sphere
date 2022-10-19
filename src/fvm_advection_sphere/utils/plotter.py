@@ -12,7 +12,7 @@ from fvm_advection_sphere.mesh.atlas_mesh import AtlasMesh
 from fvm_advection_sphere.utils.vis import make_dataset_from_arrays, start_pyvista
 
 # TODO(tehrengruber): Remove
-vis.start_pyvista()
+start_pyvista()
 
 @dataclasses.dataclass
 class Plotter:
