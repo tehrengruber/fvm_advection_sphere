@@ -230,6 +230,7 @@ for i in range(niter):
         "vel[0]": state.vel[0],
         "vel[1]": state.vel[1]
     })
+    p.save(f"plot_{i}.pdf")
 
     start_plotting = timer()
 

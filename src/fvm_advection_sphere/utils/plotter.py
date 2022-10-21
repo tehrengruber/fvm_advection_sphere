@@ -80,6 +80,9 @@ class Plotter:
         else:
             self._pv_plotter.update()  # (update sometimes hangs on linux)
 
+    def save(self, filename: str):
+        self._pv_plotter.save_graphic(filename)
+
     def update_fields(self, fields: dict[Hashable, Field]):
         for name, field in fields.items():
             dataset = self._datasets[name]
