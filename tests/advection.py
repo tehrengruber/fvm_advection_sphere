@@ -202,7 +202,6 @@ p = Plotter(
             002
            """
 )
-#p.subplot("rho")
 p.show()
 
 for i in range(niter):
@@ -225,15 +224,14 @@ for i in range(niter):
 
     update_periodic_layers(mesh, state.rho)
 
+    start_plotting = timer()
+
     p.update_fields({
         "rho": state.rho,
         "vel[0]": state.vel[0],
         "vel[1]": state.vel[1]
     })
-    p.save(f"plot_{i}.pdf")
-
-    start_plotting = timer()
-
+    #p.save(f"plot_{i}.pdf")
     p.update()
 
     end_plotting = timer()
@@ -243,4 +241,4 @@ for i in range(niter):
     print(f"Timestep {i} ({end - start}s)")
 
 print("Done")
-p.show(cpos="xy")
+p._pv_plotter.show(cpos="xy")
