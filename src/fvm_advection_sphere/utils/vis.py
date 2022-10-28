@@ -20,7 +20,7 @@ def make_dataset_from_arrays(
     vertex_fields: Dict[str, npt.ArrayLike] = None,
     edge_fields: Dict[str, npt.ArrayLike] = None,
     cell_fields: Dict[str, npt.ArrayLike] = None,
-    include_cell_conn_in_vertex_data = True
+    include_cell_conn_in_vertex_data=True,
 ) -> pv.MultiBlock:
     """Create a dataset with one block per primitive."""
     points = np.asarray(points)
@@ -44,7 +44,9 @@ def make_dataset_from_arrays(
     def prepare_conn(conn):
         num_neighbors = np.add.reduce(np.where(conn != -1, 1, 0), axis=1)
         tmp = np.concatenate((num_neighbors[:, None], conn), axis=1)
-        return tmp[np.concatenate((np.full((conn.shape[0], 1), True, dtype=bool), conn != -1), axis=1)]
+        return tmp[
+            np.concatenate((np.full((conn.shape[0], 1), True, dtype=bool), conn != -1), axis=1)
+        ]
 
     prepared_cells = prepare_conn(cells)
     prepared_edges = prepare_conn(edges)
@@ -57,17 +59,19 @@ def make_dataset_from_arrays(
 
     # Create a dataset with a different block per primitive
     blocks = pv.MultiBlock()
-    #blocks["cells"] = pv.PolyData(prepared_points, prepared_cells)
-    #cell_fields = cell_fields or {}
-    #for field_name in cell_fields:
+    # blocks["cells"] = pv.PolyData(prepared_points, prepared_cells)
+    # cell_fields = cell_fields or {}
+    # for field_name in cell_fields:
     #    blocks["cells"].cell_data[field_name] = cell_fields[field_name]
 
-    #blocks["edges"] = pv.PolyData(prepared_points, lines=prepared_edges)
-    #edge_fields = edge_fields or {}
-    #for field_name in edge_fields:
+    # blocks["edges"] = pv.PolyData(prepared_points, lines=prepared_edges)
+    # edge_fields = edge_fields or {}
+    # for field_name in edge_fields:
     #    blocks["edges"].cell_data[field_name] = edge_fields[field_name]
 
-    blocks["vertices_interpolated"] = pv.PolyData(prepared_points, prepared_cells, lines=prepared_edges)
+    blocks["vertices_interpolated"] = pv.PolyData(
+        prepared_points, prepared_cells, lines=prepared_edges
+    )
     for field_name in vertex_fields:
         blocks["vertices_interpolated"].point_data[field_name] = vertex_fields[field_name]
 
@@ -172,8 +176,8 @@ def plot_mesh(
 ) -> pv.Plotter:
     if plot is None:
         plot = pv.Plotter()
-        #from pyvistaqt import BackgroundPlotter
-        #plot = BackgroundPlotter()
+        # from pyvistaqt import BackgroundPlotter
+        # plot = BackgroundPlotter()
     if title:
         plot.add_text(title, font_size=font_size)
     plot.add_mesh(dataset, **add_mesh_kwargs)

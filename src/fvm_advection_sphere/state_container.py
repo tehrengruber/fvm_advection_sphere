@@ -9,6 +9,7 @@ import functional.ffront.common_types as ct
 from fvm_advection_sphere.mesh.atlas_mesh import DIMENSION_TO_SIZE_ATTR
 from fvm_advection_sphere.common import Vertex, Edge, Cell, K
 
+
 def allocate_field(mesh, type_: Field | ct.FieldType | ct.TupleType):
     """
     Allocate a field of zeros of given type.
@@ -26,6 +27,7 @@ def allocate_field(mesh, type_: Field | ct.FieldType | ct.TupleType):
         return allocate_field(mesh, type_)
     except Exception as e:
         raise ValueError(f"Type `{type_}` not understood.") from e
+
 
 @dataclasses.dataclass
 class StateContainer:

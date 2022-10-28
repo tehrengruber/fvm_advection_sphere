@@ -32,8 +32,9 @@ deg2rad: Final[float] = 2.0 * rpi / 360.0
 DIMENSION_TO_SIZE_ATTR: dict[Dimension, str] = {
     Vertex: "num_vertices",
     Edge: "num_edges",
-    Cell: "num_cells"
+    Cell: "num_cells",
 }
+
 
 def _atlas_connectivity_to_numpy(atlas_conn, *, out=None, skip_neighbor_indicator=-1):
     if isinstance(atlas_conn, BlockConnectivity):
@@ -55,7 +56,7 @@ def _atlas_connectivity_to_numpy(atlas_conn, *, out=None, skip_neighbor_indicato
         cols = atlas_conn.cols(i)
         for nb in range(cols):
             out[i, nb] = atlas_conn[i, nb]
-        out[i, cols:]=-1
+        out[i, cols:] = -1
 
     return out
 
@@ -67,12 +68,12 @@ def _build_atlas_mesh(config, grid, periodic_halos=None):
     # note: regularly the following calls are done implicitly using
     functionspace.EdgeColumns(mesh, halo=periodic_halos)
     functionspace.NodeColumns(mesh, halo=periodic_halos)
-    #if periodic_halos:
+    # if periodic_halos:
     #    build_parallel_fields(mesh)
     #    build_periodic_boundaries(mesh)
     #    build_halo(mesh, periodic_halos)
 
-    #build_edges(mesh, config)
+    # build_edges(mesh, config)
     build_node_to_edge_connectivity(mesh)
     build_node_to_cell_connectivity(mesh)
     build_median_dual_mesh(mesh)
@@ -145,15 +146,17 @@ class AtlasMesh:
     _atlas_mesh: Any  # for debugging
 
     def info(self):
-        n = math.ceil(math.log(self.num_edges+1, 10))
+        n = math.ceil(math.log(self.num_edges + 1, 10))
 
-        return textwrap.dedent(f"""
+        return textwrap.dedent(
+            f"""
         Atlas mesh
           grid:     {self.grid_description}
           vertices: {str(self.num_vertices).rjust(n)}
           edges:    {str(self.num_edges).rjust(n)}
           cells:    {str(self.num_cells).rjust(n)}
-        """)
+        """
+        )
 
     @classmethod
     def generate(cls, grid=StructuredGrid("O32"), radius=6371.22e03, config=None) -> "AtlasMesh":
@@ -176,7 +179,9 @@ class AtlasMesh:
         edge_flags = np.array(mesh.edges.flags(), copy=False)
         cell_flags = np.array(mesh.cells.flags(), copy=False)
 
-        vertex_ghost_mask = np_as_located_field(Vertex)((vertex_flags & Topology.GHOST).astype(bool))
+        vertex_ghost_mask = np_as_located_field(Vertex)(
+            (vertex_flags & Topology.GHOST).astype(bool)
+        )
 
         #
         # connectivities
@@ -200,15 +205,19 @@ class AtlasMesh:
         e2c = NeighborTableOffsetProvider(e2c_np, Edge, Cell, e2c_np.shape[1])
         c2v = NeighborTableOffsetProvider(c2v_np, Cell, Vertex, c2v_np.shape[1])
         c2e = NeighborTableOffsetProvider(c2e_np, Cell, Edge, c2e_np.shape[1])
-        v2ve = NeighborTableOffsetProvider(np.reshape(np.arange(0, num_vertices*v2e.max_neighbors, 1, dtype=np.int32), (num_vertices, v2e.max_neighbors)),
-                                           Vertex, VertexEdgeNb, v2e.max_neighbors)
+        v2ve = NeighborTableOffsetProvider(
+            np.reshape(
+                np.arange(0, num_vertices * v2e.max_neighbors, 1, dtype=np.int32),
+                (num_vertices, v2e.max_neighbors),
+            ),
+            Vertex,
+            VertexEdgeNb,
+            v2e.max_neighbors,
+        )
 
-        vertex_remote_indices = np.array(mesh.nodes.field("remote_idx"),
-                                         copy=False)
-        edge_remote_indices = np.array(mesh.edges.field("remote_idx"),
-                                       copy=False)
-        cell_remote_indices = np.array(mesh.cells.field("remote_idx"),
-                                       copy=False)
+        vertex_remote_indices = np.array(mesh.nodes.field("remote_idx"), copy=False)
+        edge_remote_indices = np.array(mesh.edges.field("remote_idx"), copy=False)
+        cell_remote_indices = np.array(mesh.cells.field("remote_idx"), copy=False)
 
         #
         # geometrical properties
@@ -219,14 +228,15 @@ class AtlasMesh:
         xyrad = np.array(mesh.nodes.lonlat, copy=False) * deg2rad
         xyarc = np.array(mesh.nodes.lonlat, copy=False) * deg2rad * radius
         phi, theta = xyrad[:, 1], xyrad[:, 0]
-        xyz = np.stack((
-                       np.cos(phi) * np.cos(theta), np.cos(phi) * np.sin(theta),
-                       np.sin(phi)), axis=1)
+        xyz = np.stack(
+            (np.cos(phi) * np.cos(theta), np.cos(phi) * np.sin(theta), np.sin(phi)), axis=1
+        )
 
         # face orientation
         edges_per_node = v2e_np.shape[1]
         dual_face_orientation_np = np.zeros(
-            (num_vertices, edges_per_node))  # formerly known as "sign field"
+            (num_vertices, edges_per_node)
+        )  # formerly known as "sign field"
 
         def is_pole_edge(e):
             return Topology.check(edge_flags[e], Topology.POLE)
@@ -256,88 +266,82 @@ class AtlasMesh:
                     dual_face_orientation_np[v, e_nb] = -1.0
                     if is_pole_edge(e):
                         dual_face_orientation_np[v, e_nb] = 1.0
-                dual_face_orientation_flat[edges_per_node*v+e_nb] = dual_face_orientation_np[v, e_nb]
+                dual_face_orientation_flat[edges_per_node * v + e_nb] = dual_face_orientation_np[
+                    v, e_nb
+                ]
         dual_face_orientation = np_as_located_field(Vertex, V2EDim)(dual_face_orientation_np)
         dual_face_orientation_flat = np_as_located_field(VertexEdgeNb)(dual_face_orientation_flat)
 
         # dual normal
-        dual_face_normal_weighted_np = np.array(mesh.edges.field("dual_normals"),
-                                             copy=False) * radius * deg2rad
-        dual_face_normal_weighted_x \
-            = np_as_located_field(Edge)(dual_face_normal_weighted_np[:, 0])
-        dual_face_normal_weighted_y \
-            = np_as_located_field(Edge)(dual_face_normal_weighted_np[:, 1])
+        dual_face_normal_weighted_np = (
+            np.array(mesh.edges.field("dual_normals"), copy=False) * radius * deg2rad
+        )
+        dual_face_normal_weighted_x = np_as_located_field(Edge)(dual_face_normal_weighted_np[:, 0])
+        dual_face_normal_weighted_y = np_as_located_field(Edge)(dual_face_normal_weighted_np[:, 1])
 
         # dual volume
-        vol_np = np.array(mesh.nodes.field("dual_volumes"),
-                       copy=False) * deg2rad ** 2 * radius ** 2
+        vol_np = np.array(mesh.nodes.field("dual_volumes"), copy=False) * deg2rad**2 * radius**2
         vol = np_as_located_field(Vertex)(vol_np)
 
         # offset provider
-        offset_provider = {
-            "E2V": e2v,
-            "V2E": v2e,
-            "V2EDim": V2EDim,
-            "E2VDim": E2VDim
-        }
+        offset_provider = {"E2V": e2v, "V2E": v2e, "V2EDim": V2EDim, "E2VDim": E2VDim}
 
         return cls(
             num_vertices=num_vertices,
             num_edges=num_edges,
             num_pole_edges=num_pole_edges,
             num_cells=num_cells,
-
             # connectivities
-            c2v=c2v, c2v_np=c2v_np,
-            c2e=c2e, c2e_np=c2e_np,
-            v2e=v2e, v2e_np=v2e_np,
-            v2c=v2c, v2c_np=v2c_np,
-            e2v=e2v, e2v_np=e2v_np,
-            e2c=e2c, e2c_np=e2c_np,
+            c2v=c2v,
+            c2v_np=c2v_np,
+            c2e=c2e,
+            c2e_np=c2e_np,
+            v2e=v2e,
+            v2e_np=v2e_np,
+            v2c=v2c,
+            v2c_np=v2c_np,
+            e2v=e2v,
+            e2v_np=e2v_np,
+            e2c=e2c,
+            e2c_np=e2c_np,
             v2ve=v2ve,
-
             # poles
-            pole_edge_mask=pole_edge_mask, pole_edge_mask_np=pole_edge_mask_np,
+            pole_edge_mask=pole_edge_mask,
+            pole_edge_mask_np=pole_edge_mask_np,
             pole_edges=pole_edges,
-
-            remote_indices = {
+            remote_indices={
                 Vertex: vertex_remote_indices,
                 Edge: edge_remote_indices,
-                Cell: cell_remote_indices
+                Cell: cell_remote_indices,
             },
-
             # flags
             vertex_flags=vertex_flags,
             edge_flags=edge_flags,
             cell_flags=cell_flags,
-
             vertex_ghost_mask=vertex_ghost_mask,
-
             # geometry
             radius=radius,
-            xydeg_x=xydeg_x, xydeg_y=xydeg_y, xydeg_np=xydeg_np,
+            xydeg_x=xydeg_x,
+            xydeg_y=xydeg_y,
+            xydeg_np=xydeg_np,
             xyrad=xyrad,
             xyarc=xyarc,
             xyz=xyz,
-
             vol=vol,
             vol_np=vol_np,
-            
             dual_face_normal_weighted_np=dual_face_normal_weighted_np,
             dual_face_normal_weighted_x=dual_face_normal_weighted_x,
             dual_face_normal_weighted_y=dual_face_normal_weighted_y,
-
             dual_face_orientation_np=dual_face_orientation_np,
             dual_face_orientation=dual_face_orientation,
             dual_face_orientation_flat=dual_face_orientation_flat,
-
             offset_provider=offset_provider,
-
-            grid_description = str(grid),
-
+            grid_description=str(grid),
             # for debugging
-            _atlas_mesh=mesh
+            _atlas_mesh=mesh,
         )
+
+
 def update_periodic_layers(mesh: AtlasMesh, field: Field):
     # todo: generalize to other dimensions
     horizontal_dimension = field.axes[0]

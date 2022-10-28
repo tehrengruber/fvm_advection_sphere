@@ -2,6 +2,7 @@ from typing import Tuple
 from types import SimpleNamespace
 import numpy as np
 
+
 def setup_mesh(Ni: int, Nj: int, xlim: Tuple[float, float], ylim: Tuple[float, float]):
     """
     Generate a periodic cartesian mesh with Ni x Nj vertices
@@ -70,10 +71,10 @@ def setup_mesh(Ni: int, Nj: int, xlim: Tuple[float, float], ylim: Tuple[float, f
         for i in range(0, Ni):
             cell_id = _llp_to_id(i, j)
             # c2v
-            c2v[cell_id, 0] = _llp_to_id(i, j)                      # vertex bottom-left
-            c2v[cell_id, 1] = _llp_to_id((i+Ni+1)%Ni, j)            # vertex bottom-right
-            c2v[cell_id, 2] = _llp_to_id((i+Ni+1)%Ni, (j+Nj+1)%Nj)  # vertex top-right
-            c2v[cell_id, 3] = _llp_to_id(i, (j+Nj+1)%Nj)            # vertex top-left
+            c2v[cell_id, 0] = _llp_to_id(i, j)  # vertex bottom-left
+            c2v[cell_id, 1] = _llp_to_id((i + Ni + 1) % Ni, j)  # vertex bottom-right
+            c2v[cell_id, 2] = _llp_to_id((i + Ni + 1) % Ni, (j + Nj + 1) % Nj)  # vertex top-right
+            c2v[cell_id, 3] = _llp_to_id(i, (j + Nj + 1) % Nj)  # vertex top-left
 
     # c2e, e2c
     # first uniquely attribute two edges to each cell (c2e[0] and c2e[3]) and allocate that edge
@@ -83,13 +84,13 @@ def setup_mesh(Ni: int, Nj: int, xlim: Tuple[float, float], ylim: Tuple[float, f
             cell_id = _llp_to_id(i, j)
 
             c2e[cell_id, 0] = edge_id
-            e2c[edge_id, 0] = _llp_to_id(i, (j+Nj-1)%Nj)
+            e2c[edge_id, 0] = _llp_to_id(i, (j + Nj - 1) % Nj)
             e2c[edge_id, 1] = _llp_to_id(i, j)
             edge_id += 1
 
             c2e[cell_id, 3] = edge_id
             e2c[edge_id, 0] = _llp_to_id(i, j)
-            e2c[edge_id, 1] = _llp_to_id((i+Ni-1)%Ni, j)
+            e2c[edge_id, 1] = _llp_to_id((i + Ni - 1) % Ni, j)
             edge_id += 1
 
     # then find the c2e[1] and c2e[2] edges
@@ -126,7 +127,7 @@ def setup_mesh(Ni: int, Nj: int, xlim: Tuple[float, float], ylim: Tuple[float, f
     for j in range(0, Nj):
         for i in range(0, Ni):
             cell_id = _llp_to_id(i, j)
-            cflags_periodic[cell_id] = i+1 == Ni or j+1 == Nj
+            cflags_periodic[cell_id] = i + 1 == Ni or j + 1 == Nj
 
     #
     # geometry
@@ -165,15 +166,15 @@ def setup_mesh(Ni: int, Nj: int, xlim: Tuple[float, float], ylim: Tuple[float, f
 
             if i == 0:
                 bc_l = np.copy(bc_l)
-                bc_l[0] -= xlim[1]-xlim[0]
+                bc_l[0] -= xlim[1] - xlim[0]
             if j == 0:
                 bc_b = np.copy(bc_b)
-                bc_b[1] -= ylim[1]-ylim[0]
+                bc_b[1] -= ylim[1] - ylim[0]
 
             for e, bc0, bc1 in ((c2e[cell_id, 0], bc_b, bc_c), (c2e[cell_id, 3], bc_c, bc_l)):
-                dual_face_normal_weighted[e] = (bc0-bc1) @ np.array([[0, 1], [-1, 0]])
+                dual_face_normal_weighted[e] = (bc0 - bc1) @ np.array([[0, 1], [-1, 0]])
                 dual_face_length[e] = np.linalg.norm(dual_face_normal_weighted[e])
-                dual_face_normal[e, :] = dual_face_normal_weighted[e]/dual_face_length[e]
+                dual_face_normal[e, :] = dual_face_normal_weighted[e] / dual_face_length[e]
 
     dual_face_orientation = np.zeros((num_vertices, 4))
     for v in range(0, num_vertices):

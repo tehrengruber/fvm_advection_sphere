@@ -14,6 +14,7 @@ from fvm_advection_sphere.utils.vis import make_dataset_from_arrays, start_pyvis
 # TODO(tehrengruber): Remove
 start_pyvista()
 
+
 @dataclasses.dataclass
 class Plotter:
     mesh: AtlasMesh
@@ -23,7 +24,7 @@ class Plotter:
 
     @cached_property
     def _datasets(self):
-        i=0
+        i = 0
         datasets = {}
         for name, field in self.fields.items():
             datasets[name] = make_dataset_from_arrays(
@@ -32,21 +33,20 @@ class Plotter:
                 cells=self.mesh.c2v_np,
                 vertex_fields={name: np.asarray(field)},
                 edge_fields={},
-                cell_fields={}
+                cell_fields={},
             )
         return datasets
 
     @cached_property
     def _pv_plotter(self):
         # compute layout
-        layout: list[str] = textwrap.dedent(self.layout).strip().split('\n')
+        layout: list[str] = textwrap.dedent(self.layout).strip().split("\n")
         rows, columns = len(layout), len(layout[0])
         if not all(len(line) == columns for line in layout):
             raise ValueError("Invalid layout")
 
         subplot_indices: dict[str, tuple[int, int]] = {}
-        groups_: list[tuple[set, set]] = [(set(), set()) for _ in
-                                         range(len(self.fields))]
+        groups_: list[tuple[set, set]] = [(set(), set()) for _ in range(len(self.fields))]
         for row in range(rows):
             for column in range(columns):
                 field_index = int(layout[row][column])
@@ -59,8 +59,9 @@ class Plotter:
 
         # create plotter
         plotter_args = self.plotter_args or {"interpolate_before_map": True}
-        plotter = pv.Plotter(shape=(rows, columns), row_weights=[1]*rows,
-                   col_weights=[1]*columns, groups=groups)
+        plotter = pv.Plotter(
+            shape=(rows, columns), row_weights=[1] * rows, col_weights=[1] * columns, groups=groups
+        )
 
         # plot data
         for i, (name, dataset) in enumerate(self._datasets.items()):
@@ -71,7 +72,7 @@ class Plotter:
         return plotter
 
     def show(self, title=None, font_size=None, **add_mesh_kwargs):
-        #self._pv_plotter.show(cpos="xy")
+        # self._pv_plotter.show(cpos="xy")
         self._pv_plotter.show(cpos="xy", interactive_update=True, auto_close=False)
 
     def update(self):
