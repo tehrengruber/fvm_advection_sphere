@@ -4,10 +4,10 @@ import numpy as np
 from atlas4py import StructuredGrid
 from fvm_advection_sphere.mesh.atlas_mesh import AtlasMesh
 
+
 def assert_close(expected, actual):
-    assert math.isclose(expected, actual), "expected={}, actual={}".format(
-        expected, actual
-    )
+    assert math.isclose(expected, actual), "expected={}, actual={}".format(expected, actual)
+
 
 def nabla(mesh, pp):
     deg2rad = 2.0 * np.pi / 360.0
@@ -24,11 +24,24 @@ def nabla(mesh, pp):
     pnabla_MXX = np.zeros(mesh.num_vertices)
     pnabla_MYY = np.zeros(mesh.num_vertices)
     for v in range(0, mesh.num_vertices):
-        pnabla_MXX[v] = sum(mesh.dual_face_normal_weighted_np[v2e[v, e], 0] * zavg[v2e[v, e]] * sign[v, e] for e in range(0, v2e.shape[1]) if v2e[v, e] != -1) / vol[v]
-        pnabla_MYY[v] = sum(mesh.dual_face_normal_weighted_np[v2e[v, e], 1] * zavg[v2e[v, e]] * sign[v, e] for e in range(0, v2e.shape[1]) if v2e[v, e] != -1) / vol[v]
+        pnabla_MXX[v] = (
+            sum(
+                mesh.dual_face_normal_weighted_np[v2e[v, e], 0] * zavg[v2e[v, e]] * sign[v, e]
+                for e in range(0, v2e.shape[1])
+                if v2e[v, e] != -1
+            )
+            / vol[v]
+        )
+        pnabla_MYY[v] = (
+            sum(
+                mesh.dual_face_normal_weighted_np[v2e[v, e], 1] * zavg[v2e[v, e]] * sign[v, e]
+                for e in range(0, v2e.shape[1])
+                if v2e[v, e] != -1
+            )
+            / vol[v]
+        )
 
     return pnabla_MXX, pnabla_MYY
-
 
 
 def setup_nabla():
@@ -59,27 +72,26 @@ def setup_nabla():
     for jnode in range(0, mesh.num_vertices):
         for i in range(0, 2):
             rcoords[jnode, i] = rcoords_deg[jnode, i] * deg2rad
-            rlonlatcr[jnode, i] = rcoords[
-                jnode, i
-            ]  # This is not my pattern!
+            rlonlatcr[jnode, i] = rcoords[jnode, i]  # This is not my pattern!
         rcosa[jnode] = math.cos(rlonlatcr[jnode, MYY])
         rsina[jnode] = math.sin(rlonlatcr[jnode, MYY])
     for jnode in range(0, mesh.num_vertices):
         zlon = rlonlatcr[jnode, MXX]
-        zdist = math.sin(zlatc) * rsina[jnode] + math.cos(zlatc) * rcosa[
-            jnode
-        ] * math.cos(zlon - zlonc)
+        zdist = math.sin(zlatc) * rsina[jnode] + math.cos(zlatc) * rcosa[jnode] * math.cos(
+            zlon - zlonc
+        )
         zdist = radius * math.acos(zdist)
         rzs[jnode] = 0.0
         if zdist < zrad:
-            rzs[jnode] = rzs[jnode] + 0.5 * zh0 * (
-                1.0 + math.cos(rpi * zdist / zrad)
-            ) * math.pow(math.cos(rpi * zdist / zeta), 2)
+            rzs[jnode] = rzs[jnode] + 0.5 * zh0 * (1.0 + math.cos(rpi * zdist / zrad)) * math.pow(
+                math.cos(rpi * zdist / zeta), 2
+            )
 
     assert_close(0.0000000000000000, min(rzs))
     assert_close(1965.4980340735883, max(rzs))
 
     return mesh, rzs
+
 
 mesh, pp = setup_nabla()
 
@@ -90,4 +102,4 @@ assert_close(3.5455427772565435e-003, max(pnabla_MXX))
 assert_close(-3.3540113705465301e-003, min(pnabla_MYY))
 assert_close(3.3540113705465301e-003, max(pnabla_MYY))
 
-bla = 1+1
+bla = 1 + 1
