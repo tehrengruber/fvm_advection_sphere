@@ -74,9 +74,16 @@ class Plotter:
     def show(self, title=None, font_size=None, **add_mesh_kwargs):
         # self._pv_plotter.show(cpos="xy")
         self._pv_plotter.show(cpos="xy", interactive_update=True, auto_close=False)
+        # make sure window is shown on macOS
+        if platform.system() == "Darwin":
+            self._pv_plotter.iren.interactor.ProcessEvents()
 
     def update(self):
         self._pv_plotter.render()
+        # The regular way is to use `update` which breaks on macOS and
+        #  occasionally also on linux. We just use `render` which differs
+        #  only in the fact that it forefully re-renders everytime.
+        # self._pv_plotter.update()
 
     def save(self, filename: str):
         self._pv_plotter.save_graphic(filename)
