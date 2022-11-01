@@ -76,10 +76,7 @@ class Plotter:
         self._pv_plotter.show(cpos="xy", interactive_update=True, auto_close=False)
 
     def update(self):
-        if platform.system() == "Linux":
-            self._pv_plotter.render()
-        else:
-            self._pv_plotter.update()  # (update sometimes hangs on linux)
+        self._pv_plotter.render()
 
     def save(self, filename: str):
         self._pv_plotter.save_graphic(filename)
