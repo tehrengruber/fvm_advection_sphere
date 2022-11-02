@@ -165,6 +165,7 @@ class AtlasMesh:
             config["triangulate"] = False
             config["angle"] = -1.0
             config["pole_edges"] = True
+            config["ghost_at_end"] = True
 
         # generate mesh from grid points
         # mesh = _build_atlas_mesh(config, grid)
