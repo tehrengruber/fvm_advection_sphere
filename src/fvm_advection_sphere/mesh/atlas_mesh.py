@@ -87,6 +87,8 @@ class AtlasMesh:
     num_edges: int
     num_cells: int
     num_pole_edges: int
+    nb_vertices_ghost: int
+    nb_vertices_noghost: int
 
     # connectivities
     c2v: Connectivity
@@ -152,7 +154,7 @@ class AtlasMesh:
             f"""
         Atlas mesh
           grid:     {self.grid_description}
-          vertices: {str(self.num_vertices).rjust(n)}
+          vertices: {str(self.num_vertices).rjust(n)}  (ghost: {str(self.nb_vertices_ghost).rjust(n)}, noghost: {str(self.nb_vertices_noghost).rjust(n)})
           edges:    {str(self.num_edges).rjust(n)}
           cells:    {str(self.num_cells).rjust(n)}
         """
@@ -183,6 +185,10 @@ class AtlasMesh:
         vertex_ghost_mask = np_as_located_field(Vertex)(
             (vertex_flags & Topology.GHOST).astype(bool)
         )
+
+        nb_vertices_ghost = np.sum(np.where(vertex_ghost_mask, 1, 0), dtype=int)
+        nb_vertices_noghost = num_vertices - nb_vertices_ghost
+        assert nb_vertices_noghost == np.sum(grid.nx)
 
         #
         # connectivities
@@ -292,6 +298,8 @@ class AtlasMesh:
             num_edges=num_edges,
             num_pole_edges=num_pole_edges,
             num_cells=num_cells,
+            nb_vertices_ghost=nb_vertices_ghost,
+            nb_vertices_noghost=nb_vertices_noghost,
             # connectivities
             c2v=c2v,
             c2v_np=c2v_np,
