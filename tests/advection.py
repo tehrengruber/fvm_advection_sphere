@@ -1,5 +1,3 @@
-import dataclasses
-
 import numpy as np
 
 from atlas4py import Topology
@@ -12,12 +10,11 @@ from functional.iterator.embedded import np_as_located_field
 
 from fvm_advection_sphere.common import *
 from fvm_advection_sphere import build_config
-import fvm_advection_sphere.utils.vis as vis
-from fvm_advection_sphere.utils.plotter import Plotter
 from fvm_advection_sphere.mesh.atlas_mesh import AtlasMesh, update_periodic_layers
 import fvm_advection_sphere.mesh.regular_mesh as regular_mesh
 from fvm_advection_sphere.state_container import StateContainer, allocate_field
-from fvm_advection_sphere.advection import fvm_advect
+from fvm_advection_sphere.advection import fvm_advect, advector_in_edges
+from fvm_advection_sphere.output import output_data
 from fvm_advection_sphere.metric import Metric
 
 # initialize mesh
@@ -32,7 +29,7 @@ elif mesh_type == "atlas":
     # atlas mesh
     from atlas4py import StructuredGrid
 
-    grid = StructuredGrid("O50")
+    grid = StructuredGrid("H32")
     mesh = AtlasMesh.generate(grid)
 
     if False:
@@ -69,7 +66,8 @@ print(mesh.info())
 
 # parameters
 δt = 3600.0  # time step in s
-niter = 1000
+niter = 576
+# model_endtime = 3600.0 * 24.0 * 24.0
 
 # some properties derived from the mesh
 metric = Metric.from_mesh(mesh)
@@ -92,7 +90,7 @@ def initial_rho_np(mesh: AtlasMesh):
     rcosa = np.cos(mesh.xyrad[:, 1])
 
     lonc = 0.5 * np.pi
-    latc = 0
+    latc = 0.0
     for jv in range(0, mesh.num_vertices):
         zdist = mesh.radius * np.arccos(
             np.sin(latc) * rsina[jv] + np.cos(latc) * rcosa[jv] * np.cos(mesh.xyrad[jv, 0] - lonc)
@@ -135,6 +133,9 @@ initial_rho(
     offset_provider=mesh.offset_provider,
 )
 
+outstep = 0
+output_data(mesh, state, outstep)
+
 
 @field_operator(backend=build_config.backend)
 def initial_velocity(
@@ -149,8 +150,8 @@ def initial_velocity(
 
     mesh_xyrad_x, mesh_xyrad_y = mesh_xydeg_x * DEG2RAD, mesh_xydeg_y * DEG2RAD
 
-    u0 = -30.0  # m/s
-    flow_angle = 45.0 * DEG2RAD  # radians
+    u0 = 19.30534138349186
+    flow_angle = 0.0 * DEG2RAD  # radians
 
     rsina, rcosa = sin(mesh_xyrad_y), cos(mesh_xyrad_y)
 
@@ -222,16 +223,6 @@ initial_velocity_y(
 
 state_next.vel = state.vel  # constant velocity for now
 
-p = Plotter(
-    mesh,
-    {"rho": state.rho, "vel[0]": state.vel[0], "vel[1]": state.vel[1]},
-    layout="""
-            001
-            002
-           """,
-)
-p.show()
-
 for i in range(niter):
     start = timer()
 
@@ -254,17 +245,17 @@ for i in range(niter):
 
     update_periodic_layers(mesh, state.rho)
 
-    start_plotting = timer()
+    # start_plotting = timer()
 
-    p.update_fields({"rho": state.rho, "vel[0]": state.vel[0], "vel[1]": state.vel[1]})
-    # p.save(f"plot_{i}.pdf")
-    p.update()
-
-    end_plotting = timer()
-    print(f"Plotting {i} ({end_plotting - start_plotting}s)")
+    # end_plotting = timer()
+    # print(f"Plotting {i} ({end_plotting - start_plotting}s)")
+    print(
+        f"rho | min, max, avg : {np.min(state.rho)}, {np.max(state.rho)}, {np.average(state.rho)} | "
+    )
 
     end = timer()
     print(f"Timestep {i} ({end - start}s)")
 
+outstep = 1
+output_data(mesh, state, outstep)
 print("Done")
-p._pv_plotter.show(cpos="xy")
