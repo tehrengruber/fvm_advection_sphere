@@ -2,6 +2,7 @@ import dataclasses
 
 import numpy as np
 
+from eve.utils import FrozenNamespace
 from atlas4py import Topology
 
 from timeit import default_timer as timer
@@ -67,10 +68,14 @@ with open("mesh.txt", "w") as f:
 
 print(mesh.info())
 
+constants = FrozenNamespace(
+    pi=np.pi,
+    deg2rad=2.0 * np.pi / 360.0,
+)
+
 # parameters
 δt = 3600.0  # time step in s
-niter = 576
-# model_endtime = 3600.0 * 24.0 * 24.0
+niter = 1000
 
 # some properties derived from the mesh
 metric = Metric.from_mesh(mesh)
@@ -112,19 +117,17 @@ def initial_rho(
     mesh_xydeg_y: Field[[Vertex], float],
     mesh_vertex_ghost_mask: Field[[Vertex], bool],
 ) -> Field[[Vertex], float]:
-    PI = 3.141592653589793
-    DEG2RAD = 2.0 * PI / 360.0
-    lonc = 0.5 * PI
+    lonc = 0.5 * constants.pi
     latc = 0.0
 
-    mesh_xyrad_x, mesh_xyrad_y = mesh_xydeg_x * DEG2RAD, mesh_xydeg_y * DEG2RAD
+    mesh_xyrad_x, mesh_xyrad_y = mesh_xydeg_x * constants.deg2rad, mesh_xydeg_y * constants.deg2rad
 
     rsina, rcosa = sin(mesh_xyrad_y), cos(mesh_xyrad_y)
 
     zdist = mesh_radius * arccos(sin(latc) * rsina + cos(latc) * rcosa * cos(mesh_xyrad_x - lonc))
     rpr = (zdist / (mesh_radius / 2.0)) ** 2.0
     rpr = minimum(1.0, rpr)
-    return where(mesh_vertex_ghost_mask, 0.0, 0.5 * (1.0 + cos(PI * rpr)))
+    return where(mesh_vertex_ghost_mask, 0.0, 0.5 * (1.0 + cos(constants.pi * rpr)))
 
 
 initial_rho(
@@ -145,13 +148,10 @@ def initial_velocity(
     metric_g11: Field[[Vertex], float],
     metric_g22: Field[[Vertex], float],
 ) -> tuple[Field[[Vertex], float], Field[[Vertex], float]]:
-    PI = 3.141592653589793
-    DEG2RAD = 2.0 * PI / 360.0
-
-    mesh_xyrad_x, mesh_xyrad_y = mesh_xydeg_x * DEG2RAD, mesh_xydeg_y * DEG2RAD
+    mesh_xyrad_x, mesh_xyrad_y = mesh_xydeg_x * constants.deg2rad, mesh_xydeg_y * constants.deg2rad
 
     u0 = -30.0  # m/s
-    flow_angle = 45.0 * DEG2RAD  # radians
+    flow_angle = 45.0 * constants.deg2rad  # radians
 
     rsina, rcosa = sin(mesh_xyrad_y), cos(mesh_xyrad_y)
 
