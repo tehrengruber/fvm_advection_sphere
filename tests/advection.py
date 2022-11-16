@@ -14,7 +14,7 @@ from fvm_advection_sphere import build_config
 from fvm_advection_sphere.mesh.atlas_mesh import AtlasMesh, update_periodic_layers
 import fvm_advection_sphere.mesh.regular_mesh as regular_mesh
 from fvm_advection_sphere.state_container import StateContainer, allocate_field
-from fvm_advection_sphere.advection import fvm_advect, advector_in_edges
+from fvm_advection_sphere.advection import upwind_scheme, advect_density
 from fvm_advection_sphere.output import output_data
 from fvm_advection_sphere.metric import Metric
 
@@ -85,27 +85,6 @@ ylim = (min(mesh.xyarc[:, 1]), max(mesh.xyarc[:, 1]))
 # initialize fields
 state = StateContainer.from_mesh(mesh)
 state_next = StateContainer.from_mesh(mesh)
-
-
-def initial_rho_np(mesh: AtlasMesh):
-    rho = np.zeros(mesh.num_vertices)
-    # lonc = 60/180*np.pi
-    # latc = 60/180 * np.pi
-
-    rsina = np.sin(mesh.xyrad[:, 1])
-    rcosa = np.cos(mesh.xyrad[:, 1])
-
-    lonc = 0.5 * np.pi
-    latc = 0.0
-    for jv in range(0, mesh.num_vertices):
-        zdist = mesh.radius * np.arccos(
-            np.sin(latc) * rsina[jv] + np.cos(latc) * rcosa[jv] * np.cos(mesh.xyrad[jv, 0] - lonc)
-        )
-        rpr = (zdist / (mesh.radius / 2)) ** 2
-        rpr = min(1.0, rpr)
-        if not mesh.vertex_flags[jv] & Topology.GHOST:
-            rho[jv] = 0.5 * (1.0 + np.cos(np.pi * rpr))
-    return rho
 
 
 @field_operator(backend=build_config.backend)
@@ -187,22 +166,6 @@ def initial_velocity_y(
     return initial_velocity(mesh_xydeg_x, mesh_xydeg_y, metric_gac, metric_g11, metric_g22)[1]
 
 
-def initial_velocity_np(mesh: AtlasMesh, metric: Metric) -> tuple[np.ndarray, np.ndarray]:
-    rsina = np.sin(mesh.xyrad[:, 1])
-    rcosa = np.cos(mesh.xyrad[:, 1])
-
-    u0 = -30.0  # m/s
-    flow_angle = np.deg2rad(45.0)  # radians
-
-    cosb, sinb = np.cos(flow_angle), np.sin(flow_angle)
-    uvel_x = u0 * (cosb * rcosa + rsina * np.cos(mesh.xyrad[:, 0]) * sinb)
-    uvel_y = -u0 * np.sin(mesh.xyrad[:, 0]) * sinb
-
-    vel_x = uvel_x * metric.g11 * metric.gac
-    vel_y = uvel_y * metric.g22 * metric.gac
-    return vel_x, vel_y
-
-
 initial_velocity_x(
     mesh.xydeg_x,
     mesh.xydeg_y,
@@ -227,7 +190,7 @@ state_next.vel = state.vel  # constant velocity for now
 for i in range(niter):
     start = timer()
 
-    fvm_advect(
+    advect_density(
         state.rho,
         δt,
         mesh.vol,
@@ -241,6 +204,21 @@ for i in range(niter):
         out=state_next.rho,
         offset_provider=mesh.offset_provider,
     )
+
+    # mpdata_scheme(
+    #    state.rho,
+    #    δt,
+    #    mesh.vol,
+    #    metric.gac,
+    #    state.vel[0],
+    #    state.vel[1],
+    #    mesh.pole_edge_mask,
+    #    mesh.dual_face_orientation,
+    #    mesh.dual_face_normal_weighted_x,
+    #    mesh.dual_face_normal_weighted_y,
+    #    out=state_next.rho,
+    #    offset_provider=mesh.offset_provider,
+    # )
 
     state, state_next = state_next, state  # "pointer swap"
 

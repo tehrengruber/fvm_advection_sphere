@@ -35,7 +35,7 @@ def output_data(mesh: AtlasMesh, state: StateContainer, outstep: int, output_gho
             rho = ds.createVariable("rho", float, ("xy",))
             rho[...] = state.rho[:nb_vertices_output]
 
-    output_numpy = True
+    output_numpy = False
     if output_numpy:
         filename = f"{basedir}data_{outstep}.npz"
         print(f"Define numpy array data file for {nb_vertices_output} number of xy vertices...")
