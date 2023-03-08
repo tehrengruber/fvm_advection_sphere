@@ -34,6 +34,10 @@ def output_data(mesh: AtlasMesh, state: StateContainer, outstep: int, output_gho
             latitude[...] = mesh.xyrad[:nb_vertices_output, 1]
             rho = ds.createVariable("rho", float, ("xy",))
             rho[...] = state.rho[:nb_vertices_output]
+            vx = ds.createVariable("velx", float, ("xy",))
+            vx[...] = state.vel[0][:nb_vertices_output]
+            vy = ds.createVariable("vely", float, ("xy",))
+            vy[...] = state.vel[1][:nb_vertices_output]
 
     output_numpy = False
     if output_numpy:
@@ -44,6 +48,8 @@ def output_data(mesh: AtlasMesh, state: StateContainer, outstep: int, output_gho
             longitude=mesh.xyrad[:nb_vertices_output, 0],
             latitude=mesh.xyrad[:nb_vertices_output, 1],
             rho=state.rho[:nb_vertices_output],
+            vx=state.vel[0][:nb_vertices_output],
+            vy=state.vel[1][:nb_vertices_output],
         )
 
     # output_grib = False
