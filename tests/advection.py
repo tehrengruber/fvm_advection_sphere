@@ -14,7 +14,9 @@ from fvm_advection_sphere import build_config
 from fvm_advection_sphere.mesh.atlas_mesh import AtlasMesh, update_periodic_layers
 import fvm_advection_sphere.mesh.regular_mesh as regular_mesh
 from fvm_advection_sphere.state_container import StateContainer, allocate_field
-from fvm_advection_sphere.advection import upwind_scheme, advect_density
+from fvm_advection_sphere.advection import (
+    mpdata_program,
+)  # , advect_density, mpdata_program
 from fvm_advection_sphere.output import output_data
 from fvm_advection_sphere.metric import Metric
 
@@ -71,8 +73,12 @@ constants = FrozenNamespace(
 )
 
 # parameters
-δt = 3600.0  # time step in s
-niter = 576
+# δt = 3600.0  # time step in s
+# niter = 576
+δt = 1800.0  # time step in s
+niter = 1000
+# niter = 300
+# niter = 30
 # model_endtime = 3600.0 * 24.0 * 24.0
 
 # some properties derived from the mesh
@@ -85,6 +91,13 @@ ylim = (min(mesh.xyarc[:, 1]), max(mesh.xyarc[:, 1]))
 # initialize fields
 state = StateContainer.from_mesh(mesh)
 state_next = StateContainer.from_mesh(mesh)
+
+# initialize temporaries
+tmp_fields = {}
+for i in range(4):
+    tmp_fields[f"tmp_vertex_{i}"] = allocate_field(mesh, Field[[Vertex], float])
+for j in range(2):
+    tmp_fields[f"tmp_edge_{j}"] = allocate_field(mesh, Field[[Edge], float])
 
 
 @field_operator(backend=build_config.backend)
@@ -130,7 +143,7 @@ def initial_velocity(
 ) -> tuple[Field[[Vertex], float], Field[[Vertex], float]]:
     mesh_xyrad_x, mesh_xyrad_y = mesh_xydeg_x * constants.deg2rad, mesh_xydeg_y * constants.deg2rad
 
-    u0 = 19.30534138349186
+    u0 = 22.238985328911745
     flow_angle = 0.0 * constants.deg2rad  # radians
 
     rsina, rcosa = sin(mesh_xyrad_y), cos(mesh_xyrad_y)
@@ -190,8 +203,39 @@ state_next.vel = state.vel  # constant velocity for now
 for i in range(niter):
     start = timer()
 
-    advect_density(
+    # advect_density(
+    #    state.rho,
+    #    δt,
+    #    mesh.vol,
+    #    metric.gac,
+    #    state.vel[0],
+    #    state.vel[1],
+    #    mesh.pole_edge_mask,
+    #    mesh.dual_face_orientation,
+    #    mesh.dual_face_normal_weighted_x,
+    #    mesh.dual_face_normal_weighted_y,
+    #    out=state_next.rho,
+    #    offset_provider=mesh.offset_provider,
+    # )
+
+    # upwind_scheme(
+    #    state.rho,
+    #    δt,
+    #    mesh.vol,
+    #    metric.gac,
+    #    state.vel[0],
+    #    state.vel[1],
+    #    mesh.pole_edge_mask,
+    #    mesh.dual_face_orientation,
+    #    mesh.dual_face_normal_weighted_x,
+    #    mesh.dual_face_normal_weighted_y,
+    #    out=state_next.rho,
+    #    offset_provider=mesh.offset_provider,
+    # )
+
+    mpdata_program(
         state.rho,
+        state_next.rho,
         δt,
         mesh.vol,
         metric.gac,
@@ -201,7 +245,7 @@ for i in range(niter):
         mesh.dual_face_orientation,
         mesh.dual_face_normal_weighted_x,
         mesh.dual_face_normal_weighted_y,
-        out=state_next.rho,
+        **tmp_fields,
         offset_provider=mesh.offset_provider,
     )
 
