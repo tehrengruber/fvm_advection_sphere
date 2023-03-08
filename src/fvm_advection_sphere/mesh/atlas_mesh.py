@@ -95,6 +95,7 @@ class AtlasMesh:
     c2e: Connectivity
     v2e: Connectivity
     v2c: Connectivity
+    v2v: Connectivity
     e2v: Connectivity
     e2c: Connectivity
     v2ve: Connectivity
@@ -103,6 +104,7 @@ class AtlasMesh:
     c2e_np: np.ndarray
     v2e_np: np.ndarray
     v2c_np: np.ndarray
+    v2v_np: np.ndarray
     e2v_np: np.ndarray
     e2c_np: np.ndarray
 
@@ -171,7 +173,7 @@ class AtlasMesh:
 
         # generate mesh from grid points
         # mesh = _build_atlas_mesh(config, grid)
-        mesh = _build_atlas_mesh(config, grid, periodic_halos=2)
+        mesh = _build_atlas_mesh(config, grid, periodic_halos=10)
 
         num_cells = mesh.cells.size
         num_edges = mesh.edges.size
@@ -194,6 +196,7 @@ class AtlasMesh:
         # connectivities
         v2e_np = _atlas_connectivity_to_numpy(mesh.nodes.edge_connectivity)
         v2c_np = _atlas_connectivity_to_numpy(mesh.nodes.cell_connectivity)
+        v2v_np = np.zeros(v2e_np.shape, dtype=np.int32)  # initialized further below
         e2v_np = _atlas_connectivity_to_numpy(mesh.edges.node_connectivity)
         e2c_np = _atlas_connectivity_to_numpy(mesh.edges.cell_connectivity)
         c2v_np = _atlas_connectivity_to_numpy(mesh.cells.node_connectivity)
@@ -208,6 +211,7 @@ class AtlasMesh:
 
         v2e = NeighborTableOffsetProvider(v2e_np, Vertex, Edge, v2e_np.shape[1])
         v2c = NeighborTableOffsetProvider(v2c_np, Vertex, Cell, v2c_np.shape[1])
+        v2v = NeighborTableOffsetProvider(v2v_np, Vertex, Vertex, v2v_np.shape[1])
         e2v = NeighborTableOffsetProvider(e2v_np, Edge, Vertex, e2v_np.shape[1])
         e2c = NeighborTableOffsetProvider(e2c_np, Edge, Cell, e2c_np.shape[1])
         c2v = NeighborTableOffsetProvider(c2v_np, Cell, Vertex, c2v_np.shape[1])
@@ -267,12 +271,18 @@ class AtlasMesh:
         for v in range(0, num_vertices):
             for e_nb in range(0, edges_per_node):
                 e = v2e_np[v, e_nb]
-                if v == e2v_np[e, 0]:
-                    dual_face_orientation_np[v, e_nb] = 1.0
-                else:
-                    dual_face_orientation_np[v, e_nb] = -1.0
-                    if is_pole_edge(e):
+                if e != -1:
+                    if v == e2v_np[e, 0]:
                         dual_face_orientation_np[v, e_nb] = 1.0
+                        v2v_np[v, e_nb] = e2v_np[e, 1]
+                    else:
+                        dual_face_orientation_np[v, e_nb] = -1.0
+                        v2v_np[v, e_nb] = e2v_np[e, 0]
+                        if is_pole_edge(e):
+                            dual_face_orientation_np[v, e_nb] = 1.0
+                else:
+                    dual_face_orientation_np[v, e_nb] = np.nan
+                    v2v_np[v, e_nb] = -1
                 dual_face_orientation_flat[edges_per_node * v + e_nb] = dual_face_orientation_np[
                     v, e_nb
                 ]
@@ -291,7 +301,13 @@ class AtlasMesh:
         vol = np_as_located_field(Vertex)(vol_np)
 
         # offset provider
-        offset_provider = {"E2V": e2v, "V2E": v2e, "V2EDim": V2EDim, "E2VDim": E2VDim}
+        offset_provider = {
+            "V2V": v2v,
+            "V2E": v2e,
+            "E2V": e2v,
+            "V2EDim": V2EDim,
+            "E2VDim": E2VDim,
+        }
 
         return cls(
             num_vertices=num_vertices,
@@ -301,16 +317,18 @@ class AtlasMesh:
             nb_vertices_ghost=nb_vertices_ghost,
             nb_vertices_noghost=nb_vertices_noghost,
             # connectivities
-            c2v=c2v,
-            c2v_np=c2v_np,
-            c2e=c2e,
-            c2e_np=c2e_np,
+            v2v=v2v,
+            v2v_np=v2v_np,
             v2e=v2e,
             v2e_np=v2e_np,
             v2c=v2c,
             v2c_np=v2c_np,
             e2v=e2v,
             e2v_np=e2v_np,
+            c2v=c2v,
+            c2v_np=c2v_np,
+            c2e=c2e,
+            c2e_np=c2e_np,
             e2c=e2c,
             e2c_np=e2c_np,
             v2ve=v2ve,
