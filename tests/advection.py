@@ -199,9 +199,9 @@ initial_velocity_y(
 )
 
 state_next.vel = state.vel  # constant velocity for now
+start = timer()
 
 for i in range(niter):
-    start = timer()
 
     # advect_density(
     #    state.rho,
@@ -276,9 +276,10 @@ for i in range(niter):
         f"rho | min, max, avg : {np.min(state.rho)}, {np.max(state.rho)}, {np.average(state.rho)} | "
     )
 
-    end = timer()
-    print(f"Timestep {i} ({end - start}s)")
+    print(f"Timestep {i}")
 
 outstep = 1
 output_data(mesh, state, outstep)
+end = timer()
+print(f"Timestep {i} ({end - start}s)")
 print("Done")
