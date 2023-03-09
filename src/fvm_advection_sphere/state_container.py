@@ -6,6 +6,7 @@ from functional.ffront.fbuiltins import Field
 from functional.ffront.symbol_makers import make_symbol_type_from_typing
 import functional.ffront.common_types as ct
 
+from fvm_advection_sphere.build_config import float_type
 from fvm_advection_sphere.mesh.atlas_mesh import DIMENSION_TO_SIZE_ATTR
 from fvm_advection_sphere.common import Vertex, Edge, Cell, K
 
@@ -14,7 +15,7 @@ def allocate_field(mesh, type_: Field | ct.FieldType | ct.TupleType):
     """
     Allocate a field of zeros of given type.
 
-    >>> allocate_field(mesh, Field[[Vertex], float])
+    >>> allocate_field(mesh, Field[[Vertex], float_type])
     """
     if isinstance(type_, ct.TupleType):
         return tuple(allocate_field(mesh, el_type) for el_type in type_.types)
@@ -31,8 +32,8 @@ def allocate_field(mesh, type_: Field | ct.FieldType | ct.TupleType):
 
 @dataclasses.dataclass
 class StateContainer:
-    rho: Field[[Vertex], float]
-    vel: tuple[Field[[Vertex], float], Field[[Vertex], float]]
+    rho: Field[[Vertex], float_type]
+    vel: tuple[Field[[Vertex], float_type], Field[[Vertex], float_type]]
 
     @classmethod
     def from_mesh(cls, mesh):

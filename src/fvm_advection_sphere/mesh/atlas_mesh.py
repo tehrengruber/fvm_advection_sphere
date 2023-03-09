@@ -21,13 +21,14 @@ from atlas4py import (
     BlockConnectivity,
 )
 
-from fvm_advection_sphere.common import dtype, Cell, Edge, Vertex, K, V2EDim, VertexEdgeNb, E2VDim
+from fvm_advection_sphere.build_config import float_type
+from fvm_advection_sphere.common import Cell, Edge, Vertex, K, V2EDim, VertexEdgeNb, E2VDim
 
 from functional.common import Dimension, Field, Connectivity, DimensionKind
 from functional.iterator.embedded import NeighborTableOffsetProvider, np_as_located_field
 
-rpi: Final[float] = 2.0 * math.asin(1.0)
-deg2rad: Final[float] = 2.0 * rpi / 360.0
+rpi: Final[float_type] = 2.0 * math.asin(1.0)
+deg2rad: Final[float_type] = 2.0 * rpi / 360.0
 
 DIMENSION_TO_SIZE_ATTR: dict[Dimension, str] = {
     Vertex: "num_vertices",
@@ -124,23 +125,23 @@ class AtlasMesh:
     vertex_ghost_mask: Field[[Vertex], bool]
 
     # geometry
-    radius: dtype
-    xydeg_x: Field[[Vertex], dtype]
-    xydeg_y: Field[[Vertex], dtype]
+    radius: float_type
+    xydeg_x: Field[[Vertex], float_type]
+    xydeg_y: Field[[Vertex], float_type]
     xydeg_np: np.ndarray
     xyrad: np.ndarray
     xyarc: np.ndarray
     xyz: np.ndarray
 
-    vol: Field[[Edge], dtype]
+    vol: Field[[Edge], float_type]
     vol_np: np.ndarray
 
-    dual_face_normal_weighted_x: Field[[Edge], dtype]
-    dual_face_normal_weighted_y: Field[[Edge], dtype]
+    dual_face_normal_weighted_x: Field[[Edge], float_type]
+    dual_face_normal_weighted_y: Field[[Edge], float_type]
     dual_face_normal_weighted_np: np.ndarray
 
-    dual_face_orientation: Field[[Vertex, V2EDim], dtype]
-    dual_face_orientation_flat: Field[[VertexEdgeNb], dtype]
+    dual_face_orientation: Field[[Vertex, V2EDim], float_type]
+    dual_face_orientation_flat: Field[[VertexEdgeNb], float_type]
     dual_face_orientation_np: np.ndarray
 
     offset_provider: dict[str, Connectivity | Dimension]
@@ -188,7 +189,7 @@ class AtlasMesh:
             (vertex_flags & Topology.GHOST).astype(bool)
         )
 
-        nb_vertices_ghost = np.sum(np.where(vertex_ghost_mask, 1, 0), dtype=int)
+        nb_vertices_ghost = np.sum(np.where(vertex_ghost_mask, 1, 0), dtype=np.int32)
         nb_vertices_noghost = num_vertices - nb_vertices_ghost
         assert nb_vertices_noghost == np.sum(grid.nx)
 

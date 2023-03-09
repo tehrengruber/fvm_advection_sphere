@@ -9,6 +9,7 @@ from functional.ffront.decorator import field_operator
 from functional.ffront.fbuiltins import arccos, sin, cos, where, minimum, Field
 from functional.iterator.embedded import np_as_located_field
 
+from fvm_advection_sphere.build_config import float_type
 from fvm_advection_sphere.common import *
 from fvm_advection_sphere import build_config
 from fvm_advection_sphere.mesh.atlas_mesh import AtlasMesh, update_periodic_layers
@@ -95,18 +96,18 @@ state_next = StateContainer.from_mesh(mesh)
 # initialize temporaries
 tmp_fields = {}
 for i in range(4):
-    tmp_fields[f"tmp_vertex_{i}"] = allocate_field(mesh, Field[[Vertex], float])
+    tmp_fields[f"tmp_vertex_{i}"] = allocate_field(mesh, Field[[Vertex], float_type])
 for j in range(2):
-    tmp_fields[f"tmp_edge_{j}"] = allocate_field(mesh, Field[[Edge], float])
+    tmp_fields[f"tmp_edge_{j}"] = allocate_field(mesh, Field[[Edge], float_type])
 
 
 @field_operator(backend=build_config.backend)
 def initial_rho(
-    mesh_radius: float,
-    mesh_xydeg_x: Field[[Vertex], float],
-    mesh_xydeg_y: Field[[Vertex], float],
+    mesh_radius: float_type,
+    mesh_xydeg_x: Field[[Vertex], float_type],
+    mesh_xydeg_y: Field[[Vertex], float_type],
     mesh_vertex_ghost_mask: Field[[Vertex], bool],
-) -> Field[[Vertex], float]:
+) -> Field[[Vertex], float_type]:
     lonc = 0.5 * constants.pi
     latc = 0.0
 
@@ -135,12 +136,12 @@ output_data(mesh, state, outstep)
 
 @field_operator(backend=build_config.backend)
 def initial_velocity(
-    mesh_xydeg_x: Field[[Vertex], float],
-    mesh_xydeg_y: Field[[Vertex], float],
-    metric_gac: Field[[Vertex], float],
-    metric_g11: Field[[Vertex], float],
-    metric_g22: Field[[Vertex], float],
-) -> tuple[Field[[Vertex], float], Field[[Vertex], float]]:
+    mesh_xydeg_x: Field[[Vertex], float_type],
+    mesh_xydeg_y: Field[[Vertex], float_type],
+    metric_gac: Field[[Vertex], float_type],
+    metric_g11: Field[[Vertex], float_type],
+    metric_g22: Field[[Vertex], float_type],
+) -> tuple[Field[[Vertex], float_type], Field[[Vertex], float_type]]:
     mesh_xyrad_x, mesh_xyrad_y = mesh_xydeg_x * constants.deg2rad, mesh_xydeg_y * constants.deg2rad
 
     u0 = 22.238985328911745
@@ -159,23 +160,23 @@ def initial_velocity(
 
 @field_operator(backend=build_config.backend)
 def initial_velocity_x(
-    mesh_xydeg_x: Field[[Vertex], float],
-    mesh_xydeg_y: Field[[Vertex], float],
-    metric_gac: Field[[Vertex], float],
-    metric_g11: Field[[Vertex], float],
-    metric_g22: Field[[Vertex], float],
-) -> Field[[Vertex], float]:
+    mesh_xydeg_x: Field[[Vertex], float_type],
+    mesh_xydeg_y: Field[[Vertex], float_type],
+    metric_gac: Field[[Vertex], float_type],
+    metric_g11: Field[[Vertex], float_type],
+    metric_g22: Field[[Vertex], float_type],
+) -> Field[[Vertex], float_type]:
     return initial_velocity(mesh_xydeg_x, mesh_xydeg_y, metric_gac, metric_g11, metric_g22)[0]
 
 
 @field_operator(backend=build_config.backend)
 def initial_velocity_y(
-    mesh_xydeg_x: Field[[Vertex], float],
-    mesh_xydeg_y: Field[[Vertex], float],
-    metric_gac: Field[[Vertex], float],
-    metric_g11: Field[[Vertex], float],
-    metric_g22: Field[[Vertex], float],
-) -> Field[[Vertex], float]:
+    mesh_xydeg_x: Field[[Vertex], float_type],
+    mesh_xydeg_y: Field[[Vertex], float_type],
+    metric_gac: Field[[Vertex], float_type],
+    metric_g11: Field[[Vertex], float_type],
+    metric_g22: Field[[Vertex], float_type],
+) -> Field[[Vertex], float_type]:
     return initial_velocity(mesh_xydeg_x, mesh_xydeg_y, metric_gac, metric_g11, metric_g22)[1]
 
 
