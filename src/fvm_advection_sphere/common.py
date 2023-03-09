@@ -2,8 +2,6 @@ from fvm_advection_sphere.build_config import float_type
 from functional.common import DimensionKind
 from functional.ffront.fbuiltins import FieldOffset, Dimension
 
-dtype = float_type
-
 Vertex = Dimension("Vertex")
 Edge = Dimension("Edge")
 Cell = Dimension("Cell")
