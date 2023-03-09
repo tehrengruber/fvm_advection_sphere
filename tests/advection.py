@@ -32,7 +32,7 @@ elif mesh_type == "atlas":
     # atlas mesh
     from atlas4py import StructuredGrid
 
-    grid = StructuredGrid("H32")
+    grid = StructuredGrid("O32")
     mesh = AtlasMesh.generate(grid)
 
     if False:
