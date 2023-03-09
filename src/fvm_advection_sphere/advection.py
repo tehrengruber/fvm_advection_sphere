@@ -1,4 +1,14 @@
-from functional.ffront.fbuiltins import Field, float64, where, neighbor_sum, abs
+from functional.ffront.fbuiltins import (
+    Field,
+    float64,
+    where,
+    neighbor_sum,
+    max_over,
+    min_over,
+    abs,
+    maximum,
+    minimum,
+)
 from functional.ffront.decorator import field_operator, program
 
 from fvm_advection_sphere.common import *
@@ -89,6 +99,28 @@ def flux_divergence(
 
 
 @field_operator(backend=build_config.backend)
+def local_min(
+    psi: Field[[Vertex], float64],
+) -> Field[[Vertex], float64]:
+    return minimum(psi, min_over(psi(V2V), axis=V2VDim))
+
+
+@field_operator(backend=build_config.backend)
+def local_max(
+    psi: Field[[Vertex], float64],
+) -> Field[[Vertex], float64]:
+    return maximum(psi, max_over(psi(V2V), axis=V2VDim))
+
+
+# @field_operator(backend=build_config.backend)
+# def add_ab2c_vertex(
+#    a: Field[[Vertex], float64],
+#    b: Field[[Vertex], float64],
+# ) -> Field[[Vertex], float64]:
+#    return a + b
+
+
+@field_operator(backend=build_config.backend)
 def update_solution(
     rho: Field[[Vertex], float64],
     flux: Field[[Edge], float64],
@@ -129,7 +161,6 @@ def advect_density(
     cfluxdiv = flux_divergence(cflux, vol, gac, dual_face_orientation)
 
     pseudoflux = pseudo_flux(rho, veln, gac, cfluxdiv, dt)
-    # pseudoflux = pseudo_flux_base(rho, veln)
     rho = update_solution(rho, pseudoflux, dt, vol, gac, dual_face_orientation)
 
     return rho
@@ -182,17 +213,23 @@ def mpdata_program(
         # out=rho1,
     )  # out is upwind solution (Vertex)
 
-    # centered_flux(rho1, tmp_edge_0, out=tmp_edge_1)  # out is centered flux (Edge)
+    local_min(rho0, out=tmp_vertex_2)
+    local_max(rho0, out=tmp_vertex_3)
+
     centered_flux(tmp_vertex_0, tmp_edge_0, out=tmp_edge_1)  # out is centered flux (Edge)
     flux_divergence(
         tmp_edge_1, vol, gac, dual_face_orientation, out=tmp_vertex_1
     )  # out is fluxdiv of centered flux (Vertex)
 
-    pseudo_flux(tmp_vertex_0, tmp_edge_0, gac, tmp_vertex_1, dt, out=tmp_edge_1)
+    pseudo_flux(
+        tmp_vertex_0, tmp_edge_0, gac, tmp_vertex_1, dt, out=tmp_edge_1
+    )  # out is pseudo flux (Edge)
 
     # nonoscoefficients(tmp_edge_1, dual_face_orientation, out=())
 
-    update_solution(tmp_vertex_0, tmp_edge_1, dt, vol, gac, dual_face_orientation, out=rho1)
+    update_solution(
+        tmp_vertex_0, tmp_edge_1, dt, vol, gac, dual_face_orientation, out=rho1
+    )  # out is final solution (Vertex)
 
 
 @field_operator(backend=build_config.backend)
