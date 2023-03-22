@@ -1,4 +1,4 @@
-from functional.ffront.fbuiltins import (
+from gt4py.next.ffront.fbuiltins import (
     Field,
     where,
     neighbor_sum,
@@ -8,7 +8,7 @@ from functional.ffront.fbuiltins import (
     maximum,
     minimum,
 )
-from functional.ffront.decorator import field_operator, program
+from gt4py.next.ffront.decorator import field_operator, program
 
 from fvm_advection_sphere.common import *
 from fvm_advection_sphere.build_config import float_type

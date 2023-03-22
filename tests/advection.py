@@ -1,13 +1,13 @@
 import numpy as np
 
-from eve.utils import FrozenNamespace
+from gt4py.eve.utils import FrozenNamespace
 from atlas4py import Topology
 
 from timeit import default_timer as timer
 
-from functional.ffront.decorator import field_operator
-from functional.ffront.fbuiltins import arccos, sin, cos, where, minimum, Field
-from functional.iterator.embedded import np_as_located_field
+from gt4py.next.ffront.decorator import field_operator
+from gt4py.next.ffront.fbuiltins import arccos, sin, cos, where, minimum, Field
+from gt4py.next.iterator.embedded import np_as_located_field
 
 from fvm_advection_sphere.build_config import float_type
 from fvm_advection_sphere.common import *
