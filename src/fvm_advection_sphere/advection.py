@@ -96,9 +96,9 @@ def limit_pseudo_flux(
 ) -> Field[[Edge], float_type]:
     # pflux(jlev,jedge) =  max(0._wp,pflux(jlev,jedge))*min(plimit,cp(jlev,ip2),cn(jlev,ip1)) &
     #                    & +min(0._wp,pflux(jlev,jedge))*min(plimit,cn(jlev,ip2),cp(jlev,ip1))
-    return maximum(0.0, flux) * minimum(1.0, minimum(cp(E2V[2]), cn(E2V[1]))) + minimum(
+    return maximum(0.0, flux) * minimum(1.0, minimum(cp(E2V[1]), cn(E2V[0]))) + minimum(
         0.0, flux
-    ) * minimum(1.0, minimum(cn(E2V[2]), cp(E2V[1])))
+    ) * minimum(1.0, minimum(cn(E2V[1]), cp(E2V[0])))
 
 
 @field_operator(backend=build_config.backend)
@@ -322,7 +322,13 @@ def mpdata_program(
 
     # todo(ckuehnlein): tmp_edge_2 must be used in case of nonos=True
     update_solution(
-        tmp_vertex_0, tmp_edge_1, dt, vol, gac, dual_face_orientation, out=rho1
+        tmp_vertex_0,
+        tmp_edge_2,  # tmp_edge_1 without fct, tmp_edge_2 with fct
+        dt,
+        vol,
+        gac,
+        dual_face_orientation,
+        out=rho1,
     )  # out is final solution (Vertex)
 
 

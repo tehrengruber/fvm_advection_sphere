@@ -200,6 +200,10 @@ initial_velocity_y(
     offset_provider=mesh.offset_provider,
 )
 
+print(
+    f"rho0 | min, max, avg : {np.min(state.rho)}, {np.max(state.rho)}, {np.average(state.rho)} | "
+)
+
 state_next.vel = state.vel  # constant velocity for now
 start = timer()
 
