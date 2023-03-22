@@ -81,6 +81,7 @@ niter = 1000
 # niter = 300
 # niter = 30
 # model_endtime = 3600.0 * 24.0 * 24.0
+eps = 1.0e-8
 
 # some properties derived from the mesh
 metric = Metric.from_mesh(mesh)
@@ -95,9 +96,9 @@ state_next = StateContainer.from_mesh(mesh)
 
 # initialize temporaries
 tmp_fields = {}
-for i in range(4):
+for i in range(6):
     tmp_fields[f"tmp_vertex_{i}"] = allocate_field(mesh, Field[[Vertex], float_type])
-for j in range(2):
+for j in range(3):
     tmp_fields[f"tmp_edge_{j}"] = allocate_field(mesh, Field[[Edge], float_type])
 
 
@@ -238,6 +239,7 @@ for i in range(niter):
         state.rho,
         state_next.rho,
         δt,
+        eps,
         mesh.vol,
         metric.gac,
         state.vel[0],

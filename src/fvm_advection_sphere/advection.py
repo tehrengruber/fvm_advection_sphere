@@ -88,6 +88,19 @@ def pseudo_flux(
     )
 
 
+@field_operator
+def limit_pseudo_flux(
+    flux: Field[[Edge], float_type],
+    cn: Field[[Vertex], float_type],
+    cp: Field[[Vertex], float_type],
+) -> Field[[Edge], float_type]:
+    # pflux(jlev,jedge) =  max(0._wp,pflux(jlev,jedge))*min(plimit,cp(jlev,ip2),cn(jlev,ip1)) &
+    #                    & +min(0._wp,pflux(jlev,jedge))*min(plimit,cn(jlev,ip2),cp(jlev,ip1))
+    return maximum(0.0, flux) * minimum(1.0, minimum(cp(E2V[2]), cn(E2V[1]))) + minimum(
+        0.0, flux
+    ) * minimum(1.0, minimum(cn(E2V[2]), cp(E2V[1])))
+
+
 @field_operator(backend=build_config.backend)
 def flux_divergence(
     flux: Field[[Edge], float_type],
@@ -96,6 +109,57 @@ def flux_divergence(
     dual_face_orientation: Field[[Vertex, V2EDim], float_type],
 ) -> Field[[Vertex], float_type]:
     return 1.0 / (vol * gac) * neighbor_sum(flux(V2E) * dual_face_orientation, axis=V2EDim)
+
+
+@field_operator(backend=build_config.backend)
+def nonoscoefficients_cn(
+    psimin: Field[[Vertex], float_type],
+    psi: Field[[Vertex], float_type],
+    flux: Field[[Edge], float_type],
+    vol: Field[[Vertex], float_type],
+    gac: Field[[Vertex], float_type],
+    dt: float_type,
+    eps: float_type,
+    dual_face_orientation: Field[[Vertex, V2EDim], float_type],
+) -> Field[[Vertex], float_type]:
+    # zrhout(jlev,jnode) = zrhout(jlev,jnode)+zsignp*zpos+zsignn*zneg
+    # cn(jlev,jnode)     = (pD(jlev,jnode)-zDmin(jlev,jnode))  &
+    #                   & *prho(jlev,jnode)/(zrhout(jlev,jnode)*pdt+eps)
+    # zrhout = (1.0 / vol) * neighbor_sum(
+    #    maximum(0.0, flux(V2E)) * maximum(0.0, dual_face_orientation)
+    #    + minimum(0.0, flux(V2E)) * minimum(0.0, dual_face_orientation),
+    #    axis=V2EDim,
+    # )
+    zrhout = (1.0 / vol) * neighbor_sum(
+        (
+            maximum(0.0, flux(V2E)) * maximum(0.0, dual_face_orientation)
+            + minimum(0.0, flux(V2E)) * minimum(0.0, dual_face_orientation)
+        ),
+        axis=V2EDim,
+    )
+    return (psi - psimin) * gac / (zrhout * dt + eps)
+
+
+@field_operator(backend=build_config.backend)
+def nonoscoefficients_cp(
+    psimax: Field[[Vertex], float_type],
+    psi: Field[[Vertex], float_type],
+    flux: Field[[Edge], float_type],
+    vol: Field[[Vertex], float_type],
+    gac: Field[[Vertex], float_type],
+    dt: float_type,
+    eps: float_type,
+    dual_face_orientation: Field[[Vertex, V2EDim], float_type],
+) -> Field[[Vertex], float_type]:
+    # zrhin (jlev,jnode) = zrhin (jlev,jnode)-zsignp*zneg-zsignn*zpos
+    # cp(jlev,jnode)     = (pDmax(jlev,jnode)-pD(jlev,jnode))  &
+    #                   & *prho(jlev,jnode)/(zrhin(jlev,jnode)*pdt+eps)
+    zrhin = (1.0 / vol) * neighbor_sum(
+        -minimum(0.0, flux(V2E)) * maximum(0.0, dual_face_orientation)
+        - maximum(0.0, flux(V2E)) * minimum(0.0, dual_face_orientation),
+        axis=V2EDim,
+    )
+    return (psimax - psi) * gac / (zrhin * dt + eps)
 
 
 @field_operator(backend=build_config.backend)
@@ -171,6 +235,7 @@ def mpdata_program(
     rho0: Field[[Vertex], float_type],
     rho1: Field[[Vertex], float_type],
     dt: float_type,
+    eps: float_type,
     vol: Field[[Vertex], float_type],
     gac: Field[[Vertex], float_type],
     vel_x: Field[[Vertex], float_type],
@@ -183,8 +248,11 @@ def mpdata_program(
     tmp_vertex_1: Field[[Vertex], float_type],
     tmp_vertex_2: Field[[Vertex], float_type],
     tmp_vertex_3: Field[[Vertex], float_type],
+    tmp_vertex_4: Field[[Vertex], float_type],
+    tmp_vertex_5: Field[[Vertex], float_type],
     tmp_edge_0: Field[[Edge], float_type],
     tmp_edge_1: Field[[Edge], float_type],
+    tmp_edge_2: Field[[Edge], float_type],
 ):
 
     advector_normal(
@@ -213,8 +281,8 @@ def mpdata_program(
         # out=rho1,
     )  # out is upwind solution (Vertex)
 
-    local_min(rho0, out=tmp_vertex_2)
-    local_max(rho0, out=tmp_vertex_3)
+    local_min(rho0, out=tmp_vertex_2)  # out is local min
+    local_max(rho0, out=tmp_vertex_3)  # out is local max
 
     centered_flux(tmp_vertex_0, tmp_edge_0, out=tmp_edge_1)  # out is centered flux (Edge)
     flux_divergence(
@@ -225,8 +293,34 @@ def mpdata_program(
         tmp_vertex_0, tmp_edge_0, gac, tmp_vertex_1, dt, out=tmp_edge_1
     )  # out is pseudo flux (Edge)
 
-    # nonoscoefficients(tmp_edge_1, dual_face_orientation, out=())
+    nonoscoefficients_cn(
+        tmp_vertex_2,
+        tmp_vertex_0,
+        tmp_edge_1,
+        vol,
+        gac,
+        dt,
+        eps,
+        dual_face_orientation,
+        out=tmp_vertex_4,  # out is cn nonos coefficient
+    )
+    nonoscoefficients_cp(
+        tmp_vertex_3,
+        tmp_vertex_0,
+        tmp_edge_1,
+        vol,
+        gac,
+        dt,
+        eps,
+        dual_face_orientation,
+        out=tmp_vertex_5,  # out is cp nonos coefficient
+    )
 
+    limit_pseudo_flux(
+        tmp_edge_1, tmp_vertex_4, tmp_vertex_5, out=tmp_edge_2
+    )  # out is limited pseudo flux (Edge)
+
+    # todo(ckuehnlein): tmp_edge_2 must be used in case of nonos=True
     update_solution(
         tmp_vertex_0, tmp_edge_1, dt, vol, gac, dual_face_orientation, out=rho1
     )  # out is final solution (Vertex)
