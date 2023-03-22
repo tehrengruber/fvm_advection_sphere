@@ -24,8 +24,8 @@ from atlas4py import (
 from fvm_advection_sphere.build_config import float_type
 from fvm_advection_sphere.common import Cell, Edge, Vertex, K, V2EDim, VertexEdgeNb, E2VDim
 
-from functional.common import Dimension, Field, Connectivity, DimensionKind
-from functional.iterator.embedded import NeighborTableOffsetProvider, np_as_located_field
+from gt4py.next.common import Dimension, Field, Connectivity, DimensionKind
+from gt4py.next.iterator.embedded import NeighborTableOffsetProvider, np_as_located_field
 
 rpi: Final[float_type] = 2.0 * math.asin(1.0)
 deg2rad: Final[float_type] = 2.0 * rpi / 360.0

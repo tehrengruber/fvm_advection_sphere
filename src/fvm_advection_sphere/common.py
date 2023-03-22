@@ -1,6 +1,6 @@
 from fvm_advection_sphere.build_config import float_type
-from functional.common import DimensionKind
-from functional.ffront.fbuiltins import FieldOffset, Dimension
+from gt4py.next.common import DimensionKind
+from gt4py.next.ffront.fbuiltins import FieldOffset, Dimension
 
 Vertex = Dimension("Vertex")
 Edge = Dimension("Edge")
