@@ -376,6 +376,11 @@ def update_periodic_layers(mesh: AtlasMesh, field: Field):
     assert horizontal_dimension.kind == DimensionKind.HORIZONTAL
     remote_indices = mesh.remote_indices[horizontal_dimension]
 
-    for hid in range(getattr(mesh, DIMENSION_TO_SIZE_ATTR[horizontal_dimension])):
-        if remote_indices[hid] != hid:
-            field[hid] = field[remote_indices[hid]]
+    # numpy version
+    periodic_indices = np.where(remote_indices != np.arange(0, getattr(mesh, DIMENSION_TO_SIZE_ATTR[horizontal_dimension])))
+    field[periodic_indices] = field[remote_indices[periodic_indices]]
+
+    # verbose version
+    #for hid in range(getattr(mesh, DIMENSION_TO_SIZE_ATTR[horizontal_dimension])):
+    #    if remote_indices[hid] != hid:
+    #        field[hid] = field[remote_indices[hid]]
