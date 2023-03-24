@@ -6,8 +6,7 @@ from atlas4py import Topology
 from timeit import default_timer as timer
 
 from gt4py.next.ffront.decorator import field_operator
-from gt4py.next.ffront.fbuiltins import arccos, sin, cos, where, minimum, Field
-from gt4py.next.iterator.embedded import np_as_located_field
+from gt4py.next.ffront.fbuiltins import arccos, sin, cos, where, minimum, Field, broadcast
 
 from fvm_advection_sphere.build_config import float_type
 from fvm_advection_sphere.common import *
@@ -34,7 +33,7 @@ elif mesh_type == "atlas":
     from atlas4py import StructuredGrid
 
     grid = StructuredGrid("O32")
-    mesh = AtlasMesh.generate(grid)
+    mesh = AtlasMesh.generate(grid, num_level=3)
 
     if False:
         import copy
@@ -97,9 +96,9 @@ state_next = StateContainer.from_mesh(mesh)
 # initialize temporaries
 tmp_fields = {}
 for i in range(6):
-    tmp_fields[f"tmp_vertex_{i}"] = allocate_field(mesh, Field[[Vertex], float_type])
+    tmp_fields[f"tmp_vertex_{i}"] = allocate_field(mesh, Field[[Vertex, K], float_type])
 for j in range(3):
-    tmp_fields[f"tmp_edge_{j}"] = allocate_field(mesh, Field[[Edge], float_type])
+    tmp_fields[f"tmp_edge_{j}"] = allocate_field(mesh, Field[[Edge, K], float_type])
 
 
 @field_operator(backend=build_config.backend)
@@ -108,7 +107,7 @@ def initial_rho(
     mesh_xydeg_x: Field[[Vertex], float_type],
     mesh_xydeg_y: Field[[Vertex], float_type],
     mesh_vertex_ghost_mask: Field[[Vertex], bool],
-) -> Field[[Vertex], float_type]:
+) -> Field[[Vertex, K], float_type]:
     lonc = 0.5 * constants.pi
     latc = 0.0
 
@@ -119,7 +118,7 @@ def initial_rho(
     zdist = mesh_radius * arccos(sin(latc) * rsina + cos(latc) * rcosa * cos(mesh_xyrad_x - lonc))
     rpr = (zdist / (mesh_radius / 2.0)) ** 2.0
     rpr = minimum(1.0, rpr)
-    return where(mesh_vertex_ghost_mask, 0.0, 0.5 * (1.0 + cos(constants.pi * rpr)))
+    return broadcast(where(mesh_vertex_ghost_mask, 0.0, 0.5 * (1.0 + cos(constants.pi * rpr))), (Vertex, K))
 
 
 initial_rho(
@@ -142,7 +141,7 @@ def initial_velocity(
     metric_gac: Field[[Vertex], float_type],
     metric_g11: Field[[Vertex], float_type],
     metric_g22: Field[[Vertex], float_type],
-) -> tuple[Field[[Vertex], float_type], Field[[Vertex], float_type]]:
+) -> tuple[Field[[Vertex, K], float_type], Field[[Vertex, K], float_type], Field[[Vertex, K], float_type]]:
     mesh_xyrad_x, mesh_xyrad_y = mesh_xydeg_x * constants.deg2rad, mesh_xydeg_y * constants.deg2rad
 
     u0 = 22.238985328911745
@@ -154,9 +153,10 @@ def initial_velocity(
     uvel_x = u0 * (cosb * rcosa + rsina * cos(mesh_xyrad_x) * sinb)
     uvel_y = -u0 * sin(mesh_xyrad_x) * sinb
 
-    vel_x = uvel_x * metric_g11 * metric_gac
-    vel_y = uvel_y * metric_g22 * metric_gac
-    return vel_x, vel_y
+    vel_x = broadcast(uvel_x * metric_g11 * metric_gac, (Vertex, K))
+    vel_y = broadcast(uvel_y * metric_g22 * metric_gac, (Vertex, K))
+    vel_z = broadcast(0., (Vertex, K))
+    return vel_x, vel_y, vel_z
 
 
 @field_operator(backend=build_config.backend)
@@ -166,7 +166,7 @@ def initial_velocity_x(
     metric_gac: Field[[Vertex], float_type],
     metric_g11: Field[[Vertex], float_type],
     metric_g22: Field[[Vertex], float_type],
-) -> Field[[Vertex], float_type]:
+) -> Field[[Vertex, K], float_type]:
     return initial_velocity(mesh_xydeg_x, mesh_xydeg_y, metric_gac, metric_g11, metric_g22)[0]
 
 
@@ -177,28 +177,29 @@ def initial_velocity_y(
     metric_gac: Field[[Vertex], float_type],
     metric_g11: Field[[Vertex], float_type],
     metric_g22: Field[[Vertex], float_type],
-) -> Field[[Vertex], float_type]:
+) -> Field[[Vertex, K], float_type]:
     return initial_velocity(mesh_xydeg_x, mesh_xydeg_y, metric_gac, metric_g11, metric_g22)[1]
 
+@field_operator(backend=build_config.backend)
+def initial_velocity_z(
+    mesh_xydeg_x: Field[[Vertex], float_type],
+    mesh_xydeg_y: Field[[Vertex], float_type],
+    metric_gac: Field[[Vertex], float_type],
+    metric_g11: Field[[Vertex], float_type],
+    metric_g22: Field[[Vertex], float_type],
+) -> Field[[Vertex, K], float_type]:
+    return initial_velocity(mesh_xydeg_x, mesh_xydeg_y, metric_gac, metric_g11, metric_g22)[2]
 
-initial_velocity_x(
-    mesh.xydeg_x,
-    mesh.xydeg_y,
-    metric.gac,
-    metric.g11,
-    metric.g22,
-    out=state.vel[0],
-    offset_provider=mesh.offset_provider,
-)
-initial_velocity_y(
-    mesh.xydeg_x,
-    mesh.xydeg_y,
-    metric.gac,
-    metric.g11,
-    metric.g22,
-    out=state.vel[1],
-    offset_provider=mesh.offset_provider,
-)
+for i, initializer in enumerate([initial_velocity_x, initial_velocity_y, initial_velocity_z]):
+    initializer(
+        mesh.xydeg_x,
+        mesh.xydeg_y,
+        metric.gac,
+        metric.g11,
+        metric.g22,
+        out=state.vel[i],
+        offset_provider=mesh.offset_provider,
+    )
 
 print(
     f"rho0 | min, max, avg : {np.min(state.rho)}, {np.max(state.rho)}, {np.average(state.rho)} | "
@@ -248,6 +249,7 @@ for i in range(niter):
         metric.gac,
         state.vel[0],
         state.vel[1],
+        state.vel[2],
         mesh.pole_edge_mask,
         mesh.dual_face_orientation,
         mesh.dual_face_normal_weighted_x,

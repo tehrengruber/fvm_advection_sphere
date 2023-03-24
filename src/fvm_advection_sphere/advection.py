@@ -17,10 +17,10 @@ from fvm_advection_sphere import build_config
 
 @field_operator
 def advector_in_edges(
-    vel_x: Field[[Vertex], float_type],
-    vel_y: Field[[Vertex], float_type],
+    vel_x: Field[[Vertex, K], float_type],
+    vel_y: Field[[Vertex, K], float_type],
     pole_edge_mask: Field[[Edge], bool],
-) -> tuple[Field[[Edge], float_type], Field[[Edge], float_type]]:
+) -> tuple[Field[[Edge, K], float_type], Field[[Edge, K], float_type]]:
     pole_bc = where(pole_edge_mask, -1.0, 1.0)
     vel_edges_x = 0.5 * (vel_x(E2V[0]) + pole_bc * vel_x(E2V[1]))
     vel_edges_y = 0.5 * (vel_y(E2V[0]) + pole_bc * vel_y(E2V[1]))
@@ -29,12 +29,12 @@ def advector_in_edges(
 
 @field_operator
 def advector_normal(
-    vel_x: Field[[Vertex], float_type],
-    vel_y: Field[[Vertex], float_type],
+    vel_x: Field[[Vertex, K], float_type],
+    vel_y: Field[[Vertex, K], float_type],
     pole_edge_mask: Field[[Edge], bool],
     dual_face_normal_weighted_x: Field[[Edge], float_type],
     dual_face_normal_weighted_y: Field[[Edge], float_type],
-) -> Field[[Edge], float_type]:
+) -> Field[[Edge, K], float_type]:
     pole_bc = where(pole_edge_mask, -1.0, 1.0)
     vel_edges_x = 0.5 * (vel_x(E2V[0]) + pole_bc * vel_x(E2V[1]))
     vel_edges_y = 0.5 * (vel_y(E2V[0]) + pole_bc * vel_y(E2V[1]))
@@ -45,13 +45,13 @@ def advector_normal(
 
 @field_operator
 def upstream_flux(
-    rho: Field[[Vertex], float_type],
-    vel_x: Field[[Vertex], float_type],
-    vel_y: Field[[Vertex], float_type],
+    rho: Field[[Vertex, K], float_type],
+    vel_x: Field[[Vertex, K], float_type],
+    vel_y: Field[[Vertex, K], float_type],
     pole_edge_mask: Field[[Edge], bool],
     dual_face_normal_weighted_x: Field[[Edge], float_type],
     dual_face_normal_weighted_y: Field[[Edge], float_type],
-) -> Field[[Edge], float_type]:
+) -> Field[[Edge, K], float_type]:
     vel_x_face, vel_y_face = advector_in_edges(vel_x, vel_y, pole_edge_mask)
     wnv = vel_x_face * dual_face_normal_weighted_x + vel_y_face * dual_face_normal_weighted_y
     return where(wnv > 0.0, rho(E2V[0]) * wnv, rho(E2V[1]) * wnv)
@@ -59,17 +59,17 @@ def upstream_flux(
 
 @field_operator
 def upwind_flux(
-    rho: Field[[Vertex], float_type],
-    veln: Field[[Edge], float_type],
-) -> Field[[Edge], float_type]:
+    rho: Field[[Vertex, K], float_type],
+    veln: Field[[Edge, K], float_type],
+) -> Field[[Edge, K], float_type]:
     return where(veln > 0.0, rho(E2V[0]) * veln, rho(E2V[1]) * veln)
 
 
 @field_operator
 def centered_flux(
-    rho: Field[[Vertex], float_type],
-    veln: Field[[Edge], float_type],
-) -> Field[[Edge], float_type]:
+    rho: Field[[Vertex, K], float_type],
+    veln: Field[[Edge, K], float_type],
+) -> Field[[Edge, K], float_type]:
     return (
         0.5 * veln * (rho(E2V[1]) + rho(E2V[0]))
     )  # todo(ckuehnlein): polar flip for u and v transport later
@@ -77,12 +77,12 @@ def centered_flux(
 
 @field_operator
 def pseudo_flux(
-    rho: Field[[Vertex], float_type],
-    veln: Field[[Edge], float_type],
+    rho: Field[[Vertex, K], float_type],
+    veln: Field[[Edge, K], float_type],
     grg: Field[[Vertex], float_type],
-    cfluxdiv: Field[[Vertex], float_type],
+    cfluxdiv: Field[[Vertex, K], float_type],
     dt: float_type,
-) -> Field[[Edge], float_type]:
+) -> Field[[Edge, K], float_type]:
     return 0.5 * abs(veln) * (rho(E2V[1]) - rho(E2V[0])) - dt * veln * 0.5 * (
         (cfluxdiv(E2V[1]) + cfluxdiv(E2V[0])) / (grg(E2V[1]) + grg(E2V[0]))
     )
@@ -90,10 +90,10 @@ def pseudo_flux(
 
 @field_operator
 def limit_pseudo_flux(
-    flux: Field[[Edge], float_type],
-    cn: Field[[Vertex], float_type],
-    cp: Field[[Vertex], float_type],
-) -> Field[[Edge], float_type]:
+    flux: Field[[Edge, K], float_type],
+    cn: Field[[Vertex, K], float_type],
+    cp: Field[[Vertex, K], float_type],
+) -> Field[[Edge, K], float_type]:
     # pflux(jlev,jedge) =  max(0._wp,pflux(jlev,jedge))*min(plimit,cp(jlev,ip2),cn(jlev,ip1)) &
     #                    & +min(0._wp,pflux(jlev,jedge))*min(plimit,cn(jlev,ip2),cp(jlev,ip1))
     return maximum(0.0, flux) * minimum(1.0, minimum(cp(E2V[1]), cn(E2V[0]))) + minimum(
@@ -103,25 +103,25 @@ def limit_pseudo_flux(
 
 @field_operator(backend=build_config.backend)
 def flux_divergence(
-    flux: Field[[Edge], float_type],
+    flux: Field[[Edge, K], float_type],
     vol: Field[[Vertex], float_type],
     gac: Field[[Vertex], float_type],
     dual_face_orientation: Field[[Vertex, V2EDim], float_type],
-) -> Field[[Vertex], float_type]:
+) -> Field[[Vertex, K], float_type]:
     return 1.0 / (vol * gac) * neighbor_sum(flux(V2E) * dual_face_orientation, axis=V2EDim)
 
 
 @field_operator(backend=build_config.backend)
 def nonoscoefficients_cn(
-    psimin: Field[[Vertex], float_type],
-    psi: Field[[Vertex], float_type],
-    flux: Field[[Edge], float_type],
+    psimin: Field[[Vertex, K], float_type],
+    psi: Field[[Vertex, K], float_type],
+    flux: Field[[Edge, K], float_type],
     vol: Field[[Vertex], float_type],
     gac: Field[[Vertex], float_type],
     dt: float_type,
     eps: float_type,
     dual_face_orientation: Field[[Vertex, V2EDim], float_type],
-) -> Field[[Vertex], float_type]:
+) -> Field[[Vertex, K], float_type]:
     # zrhout(jlev,jnode) = zrhout(jlev,jnode)+zsignp*zpos+zsignn*zneg
     # cn(jlev,jnode)     = (pD(jlev,jnode)-zDmin(jlev,jnode))  &
     #                   & *prho(jlev,jnode)/(zrhout(jlev,jnode)*pdt+eps)
@@ -142,15 +142,15 @@ def nonoscoefficients_cn(
 
 @field_operator(backend=build_config.backend)
 def nonoscoefficients_cp(
-    psimax: Field[[Vertex], float_type],
-    psi: Field[[Vertex], float_type],
-    flux: Field[[Edge], float_type],
+    psimax: Field[[Vertex, K], float_type],
+    psi: Field[[Vertex, K], float_type],
+    flux: Field[[Edge, K], float_type],
     vol: Field[[Vertex], float_type],
     gac: Field[[Vertex], float_type],
     dt: float_type,
     eps: float_type,
     dual_face_orientation: Field[[Vertex, V2EDim], float_type],
-) -> Field[[Vertex], float_type]:
+) -> Field[[Vertex, K], float_type]:
     # zrhin (jlev,jnode) = zrhin (jlev,jnode)-zsignp*zneg-zsignn*zpos
     # cp(jlev,jnode)     = (pDmax(jlev,jnode)-pD(jlev,jnode))  &
     #                   & *prho(jlev,jnode)/(zrhin(jlev,jnode)*pdt+eps)
@@ -164,15 +164,15 @@ def nonoscoefficients_cp(
 
 @field_operator(backend=build_config.backend)
 def local_min(
-    psi: Field[[Vertex], float_type],
-) -> Field[[Vertex], float_type]:
+    psi: Field[[Vertex, K], float_type],
+) -> Field[[Vertex, K], float_type]:
     return minimum(psi, min_over(psi(V2V), axis=V2VDim))
 
 
 @field_operator(backend=build_config.backend)
 def local_max(
-    psi: Field[[Vertex], float_type],
-) -> Field[[Vertex], float_type]:
+    psi: Field[[Vertex, K], float_type],
+) -> Field[[Vertex, K], float_type]:
     return maximum(psi, max_over(psi(V2V), axis=V2VDim))
 
 
@@ -186,29 +186,29 @@ def local_max(
 
 @field_operator(backend=build_config.backend)
 def update_solution(
-    rho: Field[[Vertex], float_type],
-    flux: Field[[Edge], float_type],
+    rho: Field[[Vertex, K], float_type],
+    flux: Field[[Edge, K], float_type],
     dt: float_type,
     vol: Field[[Vertex], float_type],
     gac: Field[[Vertex], float_type],
     dual_face_orientation: Field[[Vertex, V2EDim], float_type],
-) -> Field[[Vertex], float_type]:
+) -> Field[[Vertex, K], float_type]:
     return rho - dt / (vol * gac) * neighbor_sum(flux(V2E) * dual_face_orientation, axis=V2EDim)
 
 
 @field_operator(backend=build_config.backend)
 def advect_density(
-    rho: Field[[Vertex], float_type],
+    rho: Field[[Vertex, K], float_type],
     dt: float_type,
     vol: Field[[Vertex], float_type],
     gac: Field[[Vertex], float_type],
-    vel_x: Field[[Vertex], float_type],
-    vel_y: Field[[Vertex], float_type],
+    vel_x: Field[[Vertex, K], float_type],
+    vel_y: Field[[Vertex, K], float_type],
     pole_edge_mask: Field[[Edge], bool],
     dual_face_orientation: Field[[Vertex, V2EDim], float_type],
     dual_face_normal_weighted_x: Field[[Edge], float_type],
     dual_face_normal_weighted_y: Field[[Edge], float_type],
-) -> Field[[Vertex], float_type]:
+) -> Field[[Vertex, K], float_type]:
 
     veln = advector_normal(
         vel_x,
@@ -232,27 +232,28 @@ def advect_density(
 
 @program(backend=build_config.backend)
 def mpdata_program(
-    rho0: Field[[Vertex], float_type],
-    rho1: Field[[Vertex], float_type],
+    rho0: Field[[Vertex, K], float_type],
+    rho1: Field[[Vertex, K], float_type],
     dt: float_type,
     eps: float_type,
     vol: Field[[Vertex], float_type],
     gac: Field[[Vertex], float_type],
-    vel_x: Field[[Vertex], float_type],
-    vel_y: Field[[Vertex], float_type],
+    vel_x: Field[[Vertex, K], float_type],
+    vel_y: Field[[Vertex, K], float_type],
+    vel_z: Field[[Vertex, K], float_type],
     pole_edge_mask: Field[[Edge], bool],
     dual_face_orientation: Field[[Vertex, V2EDim], float_type],
     dual_face_normal_weighted_x: Field[[Edge], float_type],
     dual_face_normal_weighted_y: Field[[Edge], float_type],
-    tmp_vertex_0: Field[[Vertex], float_type],
-    tmp_vertex_1: Field[[Vertex], float_type],
-    tmp_vertex_2: Field[[Vertex], float_type],
-    tmp_vertex_3: Field[[Vertex], float_type],
-    tmp_vertex_4: Field[[Vertex], float_type],
-    tmp_vertex_5: Field[[Vertex], float_type],
-    tmp_edge_0: Field[[Edge], float_type],
-    tmp_edge_1: Field[[Edge], float_type],
-    tmp_edge_2: Field[[Edge], float_type],
+    tmp_vertex_0: Field[[Vertex, K], float_type],
+    tmp_vertex_1: Field[[Vertex, K], float_type],
+    tmp_vertex_2: Field[[Vertex, K], float_type],
+    tmp_vertex_3: Field[[Vertex, K], float_type],
+    tmp_vertex_4: Field[[Vertex, K], float_type],
+    tmp_vertex_5: Field[[Vertex, K], float_type],
+    tmp_edge_0: Field[[Edge, K], float_type],
+    tmp_edge_1: Field[[Edge, K], float_type],
+    tmp_edge_2: Field[[Edge, K], float_type],
 ):
 
     advector_normal(
@@ -334,17 +335,17 @@ def mpdata_program(
 
 @field_operator(backend=build_config.backend)
 def upwind_scheme(
-    rho: Field[[Vertex], float_type],
+    rho: Field[[Vertex, K], float_type],
     dt: float_type,
     vol: Field[[Vertex], float_type],
     gac: Field[[Vertex], float_type],
-    vel_x: Field[[Vertex], float_type],
-    vel_y: Field[[Vertex], float_type],
+    vel_x: Field[[Vertex, K], float_type],
+    vel_y: Field[[Vertex, K], float_type],
     pole_edge_mask: Field[[Edge], bool],
     dual_face_orientation: Field[[Vertex, V2EDim], float_type],
     dual_face_normal_weighted_x: Field[[Edge], float_type],
     dual_face_normal_weighted_y: Field[[Edge], float_type],
-) -> Field[[Vertex], float_type]:
+) -> Field[[Vertex, K], float_type]:
 
     vn = advector_normal(
         vel_x,

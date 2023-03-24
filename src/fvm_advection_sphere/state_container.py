@@ -32,8 +32,12 @@ def allocate_field(mesh, type_: Field | type_spec.FieldType | type_spec.TupleTyp
 
 @dataclasses.dataclass
 class StateContainer:
-    rho: Field[[Vertex], float_type]
-    vel: tuple[Field[[Vertex], float_type], Field[[Vertex], float_type]]
+    rho: Field[[Vertex, K], float_type]
+    vel: tuple[
+        Field[[Vertex, K], float_type],
+        Field[[Vertex, K], float_type],
+        Field[[Vertex, K], float_type]
+    ]
 
     @classmethod
     def from_mesh(cls, mesh):

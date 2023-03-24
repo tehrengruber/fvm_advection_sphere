@@ -29,4 +29,5 @@ __all__ = [
     "VertexEdgeNb",
     "V2VEDim",
     "V2VE",
+    "K"
 ]
