@@ -15,7 +15,7 @@ from fvm_advection_sphere.mesh.atlas_mesh import AtlasMesh, update_periodic_laye
 import fvm_advection_sphere.mesh.regular_mesh as regular_mesh
 from fvm_advection_sphere.state_container import StateContainer, allocate_field
 from fvm_advection_sphere.advection import (
-    mpdata_program,
+    mpdata_program, upwind_scheme, nabla_z
 )  # , advect_density, mpdata_program
 from fvm_advection_sphere.output import output_data
 from fvm_advection_sphere.metric import Metric
@@ -33,7 +33,7 @@ elif mesh_type == "atlas":
     from atlas4py import StructuredGrid
 
     grid = StructuredGrid("O32")
-    mesh = AtlasMesh.generate(grid, num_level=3)
+    mesh = AtlasMesh.generate(grid, num_level=30)
 
     if False:
         import copy
@@ -88,6 +88,8 @@ origin = mesh.xyarc.min(axis=0)
 extent = mesh.xyarc.max(axis=0) - mesh.xyarc.min(axis=0)
 xlim = (min(mesh.xyarc[:, 0]), max(mesh.xyarc[:, 0]))
 ylim = (min(mesh.xyarc[:, 1]), max(mesh.xyarc[:, 1]))
+level_indices = allocate_field(mesh, Field[[K], int])
+level_indices[...] = np.arange(0., mesh.num_level)
 
 # initialize fields
 state = StateContainer.from_mesh(mesh)
@@ -207,6 +209,12 @@ print(
 
 state_next.vel = state.vel  # constant velocity for now
 start = timer()
+
+# TODO(tehrengruber): use somewhere meaningful and remove from here
+np.asarray(tmp_fields[f"tmp_vertex_0"])[...] = np.arange(0., mesh.num_level)[np.newaxis, :]
+nabla_z(tmp_fields[f"tmp_vertex_0"], level_indices, mesh.num_level, out=tmp_fields[f"tmp_vertex_1"], offset_provider=mesh.offset_provider)
+
+bla = np.array(tmp_fields[f"tmp_vertex_1"])
 
 for i in range(niter):
 

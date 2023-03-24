@@ -14,6 +14,26 @@ from fvm_advection_sphere.common import *
 from fvm_advection_sphere.build_config import float_type
 from fvm_advection_sphere import build_config
 
+@field_operator(backend=build_config.backend)
+def with_boundary_values(
+        lower: Field[[Vertex, K], float_type],
+        interior: Field[[Vertex, K], float_type],
+        upper: Field[[Vertex, K], float_type],
+        level_indices: Field[[K], int],
+        num_level: int
+) -> Field[[Vertex, K], float_type]:
+    return where(level_indices == 0, lower, where(level_indices == num_level - 1, upper, interior))
+
+# TODO(tehrengruber): move to seperate file
+@field_operator(backend=build_config.backend)
+def nabla_z(psi: Field[[Vertex, K], float_type], level_indices: Field[[K], int], num_level: int):
+    return with_boundary_values(
+        psi(Koff[1]) - psi(Koff[0]),
+        psi(Koff[1]) - psi(Koff[-1]),
+        psi(Koff[0]) - psi(Koff[-1]),
+        level_indices, num_level # TODO(tehrengruber): use keyword args when supported
+    )
+
 
 @field_operator
 def advector_in_edges(
@@ -341,6 +361,7 @@ def upwind_scheme(
     gac: Field[[Vertex], float_type],
     vel_x: Field[[Vertex, K], float_type],
     vel_y: Field[[Vertex, K], float_type],
+    vel_z: Field[[Vertex, K], float_type],
     pole_edge_mask: Field[[Edge], bool],
     dual_face_orientation: Field[[Vertex, V2EDim], float_type],
     dual_face_normal_weighted_x: Field[[Edge], float_type],
@@ -354,6 +375,8 @@ def upwind_scheme(
         dual_face_normal_weighted_x,
         dual_face_normal_weighted_y,
     )
+
     flux = upwind_flux(rho, vn)
     rho = rho - dt / (vol * gac) * neighbor_sum(flux(V2E) * dual_face_orientation, axis=V2EDim)
     return rho
+
