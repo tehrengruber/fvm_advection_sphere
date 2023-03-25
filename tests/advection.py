@@ -33,7 +33,7 @@ elif mesh_type == "atlas":
     # atlas mesh
     from atlas4py import StructuredGrid
 
-    grid = StructuredGrid("O32")
+    grid = StructuredGrid("O160")
     mesh = AtlasMesh.generate(grid)
 
     if False:
@@ -76,7 +76,11 @@ constants = FrozenNamespace(
 # parameters
 # δt = 3600.0  # time step in s
 # niter = 576
-δt = 1800.0  # time step in s
+# δt = 1800.0  # time step in s
+# niter = 1000
+# δt = 900.0  # time step in s
+# niter = 2000
+δt = 450.0  # time step in s
 niter = 1000
 # niter = 300
 # niter = 30
