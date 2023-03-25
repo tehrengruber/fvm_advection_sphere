@@ -11,7 +11,8 @@ V2EDim = Dimension("V2E", kind=DimensionKind.LOCAL)
 V2V = FieldOffset("V2V", source=Vertex, target=(Vertex, V2VDim))
 E2V = FieldOffset("E2V", source=Vertex, target=(Edge, E2VDim))
 V2E = FieldOffset("V2E", source=Edge, target=(Vertex, V2EDim))
-K = Dimension("K")
+K = Dimension("K", kind=DimensionKind.VERTICAL)
+Koff = FieldOffset("Koff", source=K, target=(K,))
 
 VertexEdgeNb = Dimension("VertexEdgeNb")
 V2VEDim = Dimension("V2VE", kind=DimensionKind.LOCAL)
@@ -29,4 +30,6 @@ __all__ = [
     "VertexEdgeNb",
     "V2VEDim",
     "V2VE",
+    "K",
+    "Koff"
 ]

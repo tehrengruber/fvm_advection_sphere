@@ -34,6 +34,7 @@ DIMENSION_TO_SIZE_ATTR: dict[Dimension, str] = {
     Vertex: "num_vertices",
     Edge: "num_edges",
     Cell: "num_cells",
+    K: "num_level"
 }
 
 
@@ -87,6 +88,7 @@ class AtlasMesh:
     num_vertices: int
     num_edges: int
     num_cells: int
+    num_level: int
     num_pole_edges: int
     nb_vertices_ghost: int
     nb_vertices_noghost: int
@@ -160,11 +162,12 @@ class AtlasMesh:
           vertices: {str(self.num_vertices).rjust(n)}  (ghost: {str(self.nb_vertices_ghost).rjust(n)}, noghost: {str(self.nb_vertices_noghost).rjust(n)})
           edges:    {str(self.num_edges).rjust(n)}
           cells:    {str(self.num_cells).rjust(n)}
+          level:    {str(self.num_level).rjust(n)}
         """
         )
 
     @classmethod
-    def generate(cls, grid=StructuredGrid("O32"), radius=6371.22e03, config=None) -> "AtlasMesh":
+    def generate(cls, grid, num_level: int, radius=6371.22e03, config=None) -> "AtlasMesh":
         if config is None:
             config = Config()
             config["triangulate"] = False
@@ -308,6 +311,7 @@ class AtlasMesh:
             "E2V": e2v,
             "V2EDim": V2EDim,
             "E2VDim": E2VDim,
+            "Koff": K  # TODO(tehrengruber): using K here gives a terrible compilation error. Improve in GT4Py!
         }
 
         return cls(
@@ -315,6 +319,7 @@ class AtlasMesh:
             num_edges=num_edges,
             num_pole_edges=num_pole_edges,
             num_cells=num_cells,
+            num_level=num_level,
             nb_vertices_ghost=nb_vertices_ghost,
             nb_vertices_noghost=nb_vertices_noghost,
             # connectivities
@@ -378,7 +383,7 @@ def update_periodic_layers(mesh: AtlasMesh, field: Field):
 
     # numpy version
     periodic_indices = np.where(remote_indices != np.arange(0, getattr(mesh, DIMENSION_TO_SIZE_ATTR[horizontal_dimension])))
-    field[periodic_indices] = field[remote_indices[periodic_indices]]
+    field[periodic_indices, :] = field[remote_indices[periodic_indices], :]
 
     # verbose version
     #for hid in range(getattr(mesh, DIMENSION_TO_SIZE_ATTR[horizontal_dimension])):

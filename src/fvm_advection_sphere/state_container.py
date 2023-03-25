@@ -20,8 +20,15 @@ def allocate_field(mesh, type_: Field | type_spec.FieldType | type_spec.TupleTyp
     if isinstance(type_, type_spec.TupleType):
         return tuple(allocate_field(mesh, el_type) for el_type in type_.types)
     elif isinstance(type_, type_spec.FieldType):
+        np_dtype_map = {
+            type_spec.ScalarKind.INT: np.int,
+            type_spec.ScalarKind.INT32: np.int32,
+            type_spec.ScalarKind.INT64: np.int64,
+            type_spec.ScalarKind.FLOAT32: np.float32,
+            type_spec.ScalarKind.FLOAT64: np.float64,
+        } # TODO(tehrengruber): find a cleaner way
         shape = [getattr(mesh, DIMENSION_TO_SIZE_ATTR[dim]) for dim in type_.dims]
-        return np_as_located_field(*type_.dims)(np.zeros(shape))
+        return np_as_located_field(*type_.dims)(np.zeros(shape, dtype=np_dtype_map[type_.dtype.kind]))
 
     try:
         type_ = type_translation.from_type_hint(type_)
@@ -32,8 +39,12 @@ def allocate_field(mesh, type_: Field | type_spec.FieldType | type_spec.TupleTyp
 
 @dataclasses.dataclass
 class StateContainer:
-    rho: Field[[Vertex], float_type]
-    vel: tuple[Field[[Vertex], float_type], Field[[Vertex], float_type]]
+    rho: Field[[Vertex, K], float_type]
+    vel: tuple[
+        Field[[Vertex, K], float_type],
+        Field[[Vertex, K], float_type],
+        Field[[Vertex, K], float_type]
+    ]
 
     @classmethod
     def from_mesh(cls, mesh):
