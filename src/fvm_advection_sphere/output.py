@@ -9,7 +9,8 @@ from fvm_advection_sphere.state_container import StateContainer
 
 
 def output_data(mesh: AtlasMesh, state: StateContainer, outstep: int, output_ghost=False) -> None:
-
+    print("DISABLED OUTPUT")
+    return # TODO
     if output_ghost:
         nb_vertices_output = mesh.nb_vertices
     else:
