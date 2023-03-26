@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
-import eccodes
+#import eccodes
 import netCDF4 as nc
 import numpy as np
 
