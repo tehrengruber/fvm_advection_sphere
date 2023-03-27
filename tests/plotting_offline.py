@@ -8,6 +8,7 @@ import numpy as np
 outstep = 1
 data_format = "numpy"
 data_format = "netCDF"
+ilevel = 1
 
 if data_format == "numpy":
     fields = np.load(f"./data_{outstep}.npz")
@@ -31,7 +32,7 @@ xydeg_y = np.rad2deg(xyrad_y)
 xi = np.linspace(0.0, 360.0, 361)
 yi = np.linspace(-90.0, 90.0, 181)
 triang = tri.Triangulation(xydeg_x[:], xydeg_y[:])
-interpolator = tri.LinearTriInterpolator(triang, rho)
+interpolator = tri.LinearTriInterpolator(triang, rho[:, ilevel])
 # interpolator = tri.LinearTriInterpolator(triang, velx)
 # interpolator = tri.LinearTriInterpolator(triang, vely)
 Xi, Yi = np.meshgrid(xi, yi)

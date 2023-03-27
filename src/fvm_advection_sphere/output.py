@@ -15,6 +15,8 @@ def output_data(mesh: AtlasMesh, state: StateContainer, outstep: int, output_gho
     else:
         nb_vertices_output = mesh.nb_vertices_noghost
 
+    nb_levels_output = mesh.num_level
+
     basedir = "/Users/nack/fvm_advection_sphere/tests/"
     basedir = "./"
 
@@ -28,16 +30,17 @@ def output_data(mesh: AtlasMesh, state: StateContainer, outstep: int, output_gho
             # tv = ds.createVariable("t", float, ["t"])
             # tv[...] = 0.0
             _ = ds.createDimension("xy", nb_vertices_output)
+            _ = ds.createDimension("z", nb_levels_output)
             longitude = ds.createVariable("longitude", float, ("xy",))
             longitude[...] = mesh.xyrad[:nb_vertices_output, 0]
             latitude = ds.createVariable("latitude", float, ("xy",))
             latitude[...] = mesh.xyrad[:nb_vertices_output, 1]
-            rho = ds.createVariable("rho", float, ("xy",))
-            rho[...] = state.rho[:nb_vertices_output]
-            vx = ds.createVariable("velx", float, ("xy",))
-            vx[...] = state.vel[0][:nb_vertices_output]
-            vy = ds.createVariable("vely", float, ("xy",))
-            vy[...] = state.vel[1][:nb_vertices_output]
+            rho = ds.createVariable("rho", float, ("xy", "z"))
+            rho[:, :] = state.rho[:nb_vertices_output, :]
+            vx = ds.createVariable("velx", float, ("xy", "z"))
+            vx[:, :] = state.vel[0][:nb_vertices_output]
+            vy = ds.createVariable("vely", float, ("xy", "z"))
+            vy[:, :] = state.vel[1][:nb_vertices_output]
 
     output_numpy = False
     if output_numpy:
@@ -47,9 +50,9 @@ def output_data(mesh: AtlasMesh, state: StateContainer, outstep: int, output_gho
             filename,
             longitude=mesh.xyrad[:nb_vertices_output, 0],
             latitude=mesh.xyrad[:nb_vertices_output, 1],
-            rho=state.rho[:nb_vertices_output],
-            vx=state.vel[0][:nb_vertices_output],
-            vy=state.vel[1][:nb_vertices_output],
+            rho=state.rho[:nb_vertices_output, :],
+            vx=state.vel[0][:nb_vertices_output, :],
+            vy=state.vel[1][:nb_vertices_output, :],
         )
 
     # output_grib = False
