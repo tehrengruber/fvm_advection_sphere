@@ -14,15 +14,17 @@ from fvm_advection_sphere.common import *
 from fvm_advection_sphere.build_config import float_type
 from fvm_advection_sphere import build_config
 
+
 @field_operator(backend=build_config.backend)
 def with_boundary_values(
-        lower: Field[[Vertex, K], float_type],
-        interior: Field[[Vertex, K], float_type],
-        upper: Field[[Vertex, K], float_type],
-        level_indices: Field[[K], int],
-        num_level: int
+    lower: Field[[Vertex, K], float_type],
+    interior: Field[[Vertex, K], float_type],
+    upper: Field[[Vertex, K], float_type],
+    level_indices: Field[[K], int],
+    num_level: int,
 ) -> Field[[Vertex, K], float_type]:
     return where(level_indices == 0, lower, where(level_indices == num_level - 1, upper, interior))
+
 
 # TODO(tehrengruber): move to seperate file
 @field_operator(backend=build_config.backend)
@@ -31,7 +33,8 @@ def nabla_z(psi: Field[[Vertex, K], float_type], level_indices: Field[[K], int],
         psi(Koff[1]) - psi(Koff[0]),
         psi(Koff[1]) - psi(Koff[-1]),
         psi(Koff[0]) - psi(Koff[-1]),
-        level_indices, num_level # TODO(tehrengruber): use keyword args when supported
+        level_indices,
+        num_level,  # TODO(tehrengruber): use keyword args when supported
     )
 
 
@@ -114,8 +117,6 @@ def limit_pseudo_flux(
     cn: Field[[Vertex, K], float_type],
     cp: Field[[Vertex, K], float_type],
 ) -> Field[[Edge, K], float_type]:
-    # pflux(jlev,jedge) =  max(0._wp,pflux(jlev,jedge))*min(plimit,cp(jlev,ip2),cn(jlev,ip1)) &
-    #                    & +min(0._wp,pflux(jlev,jedge))*min(plimit,cn(jlev,ip2),cp(jlev,ip1))
     return maximum(0.0, flux) * minimum(1.0, minimum(cp(E2V[1]), cn(E2V[0]))) + minimum(
         0.0, flux
     ) * minimum(1.0, minimum(cn(E2V[1]), cp(E2V[0])))
@@ -142,14 +143,6 @@ def nonoscoefficients_cn(
     eps: float_type,
     dual_face_orientation: Field[[Vertex, V2EDim], float_type],
 ) -> Field[[Vertex, K], float_type]:
-    # zrhout(jlev,jnode) = zrhout(jlev,jnode)+zsignp*zpos+zsignn*zneg
-    # cn(jlev,jnode)     = (pD(jlev,jnode)-zDmin(jlev,jnode))  &
-    #                   & *prho(jlev,jnode)/(zrhout(jlev,jnode)*pdt+eps)
-    # zrhout = (1.0 / vol) * neighbor_sum(
-    #    maximum(0.0, flux(V2E)) * maximum(0.0, dual_face_orientation)
-    #    + minimum(0.0, flux(V2E)) * minimum(0.0, dual_face_orientation),
-    #    axis=V2EDim,
-    # )
     zrhout = (1.0 / vol) * neighbor_sum(
         (
             maximum(0.0, flux(V2E)) * maximum(0.0, dual_face_orientation)
@@ -171,9 +164,6 @@ def nonoscoefficients_cp(
     eps: float_type,
     dual_face_orientation: Field[[Vertex, V2EDim], float_type],
 ) -> Field[[Vertex, K], float_type]:
-    # zrhin (jlev,jnode) = zrhin (jlev,jnode)-zsignp*zneg-zsignn*zpos
-    # cp(jlev,jnode)     = (pDmax(jlev,jnode)-pD(jlev,jnode))  &
-    #                   & *prho(jlev,jnode)/(zrhin(jlev,jnode)*pdt+eps)
     zrhin = (1.0 / vol) * neighbor_sum(
         -minimum(0.0, flux(V2E)) * maximum(0.0, dual_face_orientation)
         - maximum(0.0, flux(V2E)) * minimum(0.0, dual_face_orientation),
@@ -379,4 +369,3 @@ def upwind_scheme(
     flux = upwind_flux(rho, vn)
     rho = rho - dt / (vol * gac) * neighbor_sum(flux(V2E) * dual_face_orientation, axis=V2EDim)
     return rho
-

@@ -17,7 +17,6 @@ def output_data(mesh: AtlasMesh, state: StateContainer, outstep: int, output_gho
 
     nb_levels_output = mesh.num_level
 
-    basedir = "/Users/nack/fvm_advection_sphere/tests/"
     basedir = "./"
 
     output_netcdf = True
