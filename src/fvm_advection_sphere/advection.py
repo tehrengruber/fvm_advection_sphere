@@ -102,12 +102,11 @@ def centered_flux(
 def pseudo_flux(
     rho: Field[[Vertex, K], float_type],
     veln: Field[[Edge, K], float_type],
-    grg: Field[[Vertex], float_type],
     cfluxdiv: Field[[Vertex, K], float_type],
     dt: float_type,
 ) -> Field[[Edge, K], float_type]:
-    return 0.5 * abs(veln) * (rho(E2V[1]) - rho(E2V[0])) - dt * veln * 0.5 * (
-        (cfluxdiv(E2V[1]) + cfluxdiv(E2V[0])) / (grg(E2V[1]) + grg(E2V[0]))
+    return 0.5 * abs(veln) * (rho(E2V[1]) - rho(E2V[0])) - dt * veln * 0.25 * (
+        (cfluxdiv(E2V[1]) + cfluxdiv(E2V[0]))
     )
 
 
@@ -126,10 +125,10 @@ def limit_pseudo_flux(
 def flux_divergence(
     flux: Field[[Edge, K], float_type],
     vol: Field[[Vertex], float_type],
-    gac: Field[[Vertex], float_type],
+    grg: Field[[Vertex], float_type],
     dual_face_orientation: Field[[Vertex, V2EDim], float_type],
 ) -> Field[[Vertex, K], float_type]:
-    return 1.0 / (vol * gac) * neighbor_sum(flux(V2E) * dual_face_orientation, axis=V2EDim)
+    return 1.0 / (vol * grg) * neighbor_sum(flux(V2E) * dual_face_orientation, axis=V2EDim)
 
 
 @field_operator(backend=build_config.backend)
@@ -234,7 +233,7 @@ def advect_density(
     cflux = centered_flux(rho, veln)
     cfluxdiv = flux_divergence(cflux, vol, gac, dual_face_orientation)
 
-    pseudoflux = pseudo_flux(rho, veln, gac, cfluxdiv, dt)
+    pseudoflux = pseudo_flux(rho, veln, cfluxdiv, dt)
     rho = update_solution(rho, pseudoflux, dt, vol, gac, dual_face_orientation)
 
     return rho
@@ -301,7 +300,7 @@ def mpdata_program(
     )  # out is fluxdiv of centered flux (Vertex)
 
     pseudo_flux(
-        tmp_vertex_0, tmp_edge_0, gac, tmp_vertex_1, dt, out=tmp_edge_1
+        tmp_vertex_0, tmp_edge_0, tmp_vertex_1, dt, out=tmp_edge_1
     )  # out is pseudo flux (Edge)
 
     nonoscoefficients_cn(
@@ -334,13 +333,59 @@ def mpdata_program(
     # todo(ckuehnlein): tmp_edge_2 must be used in case of nonos=True
     update_solution(
         tmp_vertex_0,
-        tmp_edge_2,  # tmp_edge_1 without fct, tmp_edge_2 with fct
+        tmp_edge_1,  # tmp_edge_1 without fct, tmp_edge_2 with fct
         dt,
         vol,
         gac,
         dual_face_orientation,
         out=rho1,
     )  # out is final solution (Vertex)
+
+
+@program(backend=build_config.backend)
+def upwind_program(
+    rho0: Field[[Vertex, K], float_type],
+    rho1: Field[[Vertex, K], float_type],
+    dt: float_type,
+    eps: float_type,
+    vol: Field[[Vertex], float_type],
+    gac: Field[[Vertex], float_type],
+    vel_x: Field[[Vertex, K], float_type],
+    vel_y: Field[[Vertex, K], float_type],
+    vel_z: Field[[Vertex, K], float_type],
+    pole_edge_mask: Field[[Edge], bool],
+    dual_face_orientation: Field[[Vertex, V2EDim], float_type],
+    dual_face_normal_weighted_x: Field[[Edge], float_type],
+    dual_face_normal_weighted_y: Field[[Edge], float_type],
+    tmp_vertex_0: Field[[Vertex, K], float_type],
+    tmp_vertex_1: Field[[Vertex, K], float_type],
+    tmp_vertex_2: Field[[Vertex, K], float_type],
+    tmp_vertex_3: Field[[Vertex, K], float_type],
+    tmp_vertex_4: Field[[Vertex, K], float_type],
+    tmp_vertex_5: Field[[Vertex, K], float_type],
+    tmp_edge_0: Field[[Edge, K], float_type],
+    tmp_edge_1: Field[[Edge, K], float_type],
+    tmp_edge_2: Field[[Edge, K], float_type],
+):
+
+    advector_normal(
+        vel_x,
+        vel_y,
+        pole_edge_mask,
+        dual_face_normal_weighted_x,
+        dual_face_normal_weighted_y,
+        out=tmp_edge_0,
+    )
+    upwind_flux(rho0, tmp_edge_0, out=tmp_edge_1)
+    update_solution(
+        rho0,
+        tmp_edge_1,
+        dt,
+        vol,
+        gac,
+        dual_face_orientation,
+        out=rho1,
+    )  # out is upwind solution (Vertex)
 
 
 @field_operator(backend=build_config.backend)

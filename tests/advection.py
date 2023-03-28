@@ -16,7 +16,7 @@ import fvm_advection_sphere.mesh.regular_mesh as regular_mesh
 from fvm_advection_sphere.state_container import StateContainer, allocate_field
 from fvm_advection_sphere.advection import (
     mpdata_program,
-    upwind_scheme,
+    upwind_program,
     nabla_z,
 )  # , advect_density, mpdata_program
 from fvm_advection_sphere.output import output_data
@@ -34,7 +34,7 @@ elif mesh_type == "atlas":
     # atlas mesh
     from atlas4py import StructuredGrid
 
-    grid = StructuredGrid("O160")
+    grid = StructuredGrid("O32")
     mesh = AtlasMesh.generate(grid, num_level=3)
 
     if False:
@@ -74,19 +74,20 @@ constants = FrozenNamespace(
     deg2rad=2.0 * np.pi / 360.0,
 )
 
+applied_scheme = "mpdata"
 # parameters
 # δt = 3600.0  # time step in s
 # niter = 576
-# δt = 1800.0  # time step in s
-# niter = 1000
+δt = 1800.0  # time step in s
+niter = 1000
 # δt = 900.0  # time step in s
 # niter = 2000
-δt = 450.0  # time step in s
-niter = 4000
+# δt = 450.0  # time step in s
+# niter = 4000
 # niter = 300
 # niter = 30
 # model_endtime = 3600.0 * 24.0 * 24.0
-eps = 1.0e-8
+eps = 1.0e-9
 
 # some properties derived from the mesh
 metric = Metric.from_mesh(mesh)
@@ -157,7 +158,7 @@ def initial_velocity(
     mesh_xyrad_x, mesh_xyrad_y = mesh_xydeg_x * constants.deg2rad, mesh_xydeg_y * constants.deg2rad
 
     u0 = 22.238985328911745
-    flow_angle = 0.0 * constants.deg2rad  # radians
+    flow_angle = 90.0 * constants.deg2rad  # radians
 
     rsina, rcosa = sin(mesh_xyrad_y), cos(mesh_xyrad_y)
 
@@ -266,23 +267,42 @@ for i in range(niter):
     #    offset_provider=mesh.offset_provider,
     # )
 
-    mpdata_program(
-        state.rho,
-        state_next.rho,
-        δt,
-        eps,
-        mesh.vol,
-        metric.gac,
-        state.vel[0],
-        state.vel[1],
-        state.vel[2],
-        mesh.pole_edge_mask,
-        mesh.dual_face_orientation,
-        mesh.dual_face_normal_weighted_x,
-        mesh.dual_face_normal_weighted_y,
-        **tmp_fields,
-        offset_provider=mesh.offset_provider,
-    )
+    if applied_scheme == "upwind":
+        upwind_program(
+            state.rho,
+            state_next.rho,
+            δt,
+            eps,
+            mesh.vol,
+            metric.gac,
+            state.vel[0],
+            state.vel[1],
+            state.vel[2],
+            mesh.pole_edge_mask,
+            mesh.dual_face_orientation,
+            mesh.dual_face_normal_weighted_x,
+            mesh.dual_face_normal_weighted_y,
+            **tmp_fields,
+            offset_provider=mesh.offset_provider,
+        )
+    else:
+        mpdata_program(
+            state.rho,
+            state_next.rho,
+            δt,
+            eps,
+            mesh.vol,
+            metric.gac,
+            state.vel[0],
+            state.vel[1],
+            state.vel[2],
+            mesh.pole_edge_mask,
+            mesh.dual_face_orientation,
+            mesh.dual_face_normal_weighted_x,
+            mesh.dual_face_normal_weighted_y,
+            **tmp_fields,
+            offset_provider=mesh.offset_provider,
+        )
 
     # mpdata_scheme(
     #    state.rho,
