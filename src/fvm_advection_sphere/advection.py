@@ -173,16 +173,22 @@ def nonoscoefficients_cp(
 
 @field_operator(backend=build_config.backend)
 def local_min(
-    psi: Field[[Vertex, K], float_type],
+    psi0: Field[[Vertex, K], float_type],
+    psi1: Field[[Vertex, K], float_type],
 ) -> Field[[Vertex, K], float_type]:
-    return minimum(psi, min_over(psi(V2V), axis=V2VDim))
+    psi0_min = minimum(psi0, min_over(psi0(V2V), axis=V2VDim))
+    psi1_min = minimum(psi1, min_over(psi1(V2V), axis=V2VDim))
+    return minimum(psi0_min, psi1_min)
 
 
 @field_operator(backend=build_config.backend)
 def local_max(
-    psi: Field[[Vertex, K], float_type],
+    psi0: Field[[Vertex, K], float_type],
+    psi1: Field[[Vertex, K], float_type],
 ) -> Field[[Vertex, K], float_type]:
-    return maximum(psi, max_over(psi(V2V), axis=V2VDim))
+    psi0_max = maximum(psi0, max_over(psi0(V2V), axis=V2VDim))
+    psi1_max = maximum(psi1, max_over(psi1(V2V), axis=V2VDim))
+    return maximum(psi0_max, psi1_max)
 
 
 # @field_operator(backend=build_config.backend)
@@ -291,8 +297,8 @@ def mpdata_program(
         # out=rho1,
     )  # out is upwind solution (Vertex)
 
-    local_min(rho0, out=tmp_vertex_2)  # out is local min
-    local_max(rho0, out=tmp_vertex_3)  # out is local max
+    local_min(rho0, tmp_vertex_0, out=tmp_vertex_2)  # out is local min
+    local_max(rho0, tmp_vertex_0, out=tmp_vertex_3)  # out is local max
 
     centered_flux(tmp_vertex_0, tmp_edge_0, out=tmp_edge_1)  # out is centered flux (Edge)
     flux_divergence(
@@ -333,7 +339,7 @@ def mpdata_program(
     # todo(ckuehnlein): tmp_edge_2 must be used in case of nonos=True
     update_solution(
         tmp_vertex_0,
-        tmp_edge_1,  # tmp_edge_1 without fct, tmp_edge_2 with fct
+        tmp_edge_2,  # tmp_edge_1 without fct, tmp_edge_2 with fct
         dt,
         vol,
         gac,
