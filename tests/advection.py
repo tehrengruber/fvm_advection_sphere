@@ -5,9 +5,9 @@ from atlas4py import Topology
 
 from timeit import default_timer as timer
 
+from gt4py.next.common import GridType
 from gt4py.next.ffront.decorator import field_operator
 from gt4py.next.ffront.fbuiltins import arccos, sin, cos, where, minimum, Field, broadcast
-
 from fvm_advection_sphere.build_config import float_type
 from fvm_advection_sphere.common import *
 from fvm_advection_sphere import build_config
@@ -103,7 +103,7 @@ for j in range(3):
     tmp_fields[f"tmp_edge_{j}"] = allocate_field(mesh, Field[[Edge, K], float_type])
 
 
-@field_operator(backend=build_config.backend)
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def initial_rho(
     mesh_radius: float_type,
     mesh_xydeg_x: Field[[Vertex], float_type],
@@ -136,7 +136,7 @@ outstep = 0
 output_data(mesh, state, outstep)
 
 
-@field_operator(backend=build_config.backend)
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def initial_velocity(
     mesh_xydeg_x: Field[[Vertex], float_type],
     mesh_xydeg_y: Field[[Vertex], float_type],

@@ -1,3 +1,4 @@
+from gt4py.next.common import GridType
 from gt4py.next.ffront.fbuiltins import (
     Field,
     where,
@@ -25,7 +26,7 @@ def with_boundary_values(
     return where(level_indices == 0, lower, where(level_indices == num_level - 1, upper, interior))
 
 # TODO(tehrengruber): move to seperate file
-@field_operator(backend=build_config.backend)
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def nabla_z(psi: Field[[Vertex, K], float_type], level_indices: Field[[K], int], num_level: int):
     return with_boundary_values(
         psi(Koff[1]) - psi(Koff[0]),
@@ -35,7 +36,7 @@ def nabla_z(psi: Field[[Vertex, K], float_type], level_indices: Field[[K], int],
     )
 
 
-@field_operator
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def advector_in_edges(
     vel_x: Field[[Vertex, K], float_type],
     vel_y: Field[[Vertex, K], float_type],
@@ -47,7 +48,7 @@ def advector_in_edges(
     return vel_edges_x, where(pole_edge_mask, 0.0, vel_edges_y)
 
 
-@field_operator
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def advector_normal(
     vel_x: Field[[Vertex, K], float_type],
     vel_y: Field[[Vertex, K], float_type],
@@ -63,7 +64,7 @@ def advector_normal(
     return vel_edges_x * dual_face_normal_weighted_x + vel_edges_y * dual_face_normal_weighted_y
 
 
-@field_operator
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def upstream_flux(
     rho: Field[[Vertex, K], float_type],
     vel_x: Field[[Vertex, K], float_type],
@@ -77,7 +78,7 @@ def upstream_flux(
     return where(wnv > 0.0, rho(E2V[0]) * wnv, rho(E2V[1]) * wnv)
 
 
-@field_operator
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def upwind_flux(
     rho: Field[[Vertex, K], float_type],
     veln: Field[[Edge, K], float_type],
@@ -85,7 +86,7 @@ def upwind_flux(
     return where(veln > 0.0, rho(E2V[0]) * veln, rho(E2V[1]) * veln)
 
 
-@field_operator
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def centered_flux(
     rho: Field[[Vertex, K], float_type],
     veln: Field[[Edge, K], float_type],
@@ -95,7 +96,7 @@ def centered_flux(
     )  # todo(ckuehnlein): polar flip for u and v transport later
 
 
-@field_operator
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def pseudo_flux(
     rho: Field[[Vertex, K], float_type],
     veln: Field[[Edge, K], float_type],
@@ -108,7 +109,7 @@ def pseudo_flux(
     )
 
 
-@field_operator
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def limit_pseudo_flux(
     flux: Field[[Edge, K], float_type],
     cn: Field[[Vertex, K], float_type],
@@ -121,7 +122,7 @@ def limit_pseudo_flux(
     ) * minimum(1.0, minimum(cn(E2V[1]), cp(E2V[0])))
 
 
-@field_operator(backend=build_config.backend)
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def flux_divergence(
     flux: Field[[Edge, K], float_type],
     vol: Field[[Vertex], float_type],
@@ -131,7 +132,7 @@ def flux_divergence(
     return 1.0 / (vol * gac) * neighbor_sum(flux(V2E) * dual_face_orientation, axis=V2EDim)
 
 
-@field_operator(backend=build_config.backend)
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def nonoscoefficients_cn(
     psimin: Field[[Vertex, K], float_type],
     psi: Field[[Vertex, K], float_type],
@@ -160,7 +161,7 @@ def nonoscoefficients_cn(
     return (psi - psimin) * gac / (zrhout * dt + eps)
 
 
-@field_operator(backend=build_config.backend)
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def nonoscoefficients_cp(
     psimax: Field[[Vertex, K], float_type],
     psi: Field[[Vertex, K], float_type],
@@ -182,21 +183,21 @@ def nonoscoefficients_cp(
     return (psimax - psi) * gac / (zrhin * dt + eps)
 
 
-@field_operator(backend=build_config.backend)
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def local_min(
     psi: Field[[Vertex, K], float_type],
 ) -> Field[[Vertex, K], float_type]:
     return minimum(psi, min_over(psi(V2V), axis=V2VDim))
 
 
-@field_operator(backend=build_config.backend)
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def local_max(
     psi: Field[[Vertex, K], float_type],
 ) -> Field[[Vertex, K], float_type]:
     return maximum(psi, max_over(psi(V2V), axis=V2VDim))
 
 
-@field_operator(backend=build_config.backend)
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def update_solution(
     rho: Field[[Vertex, K], float_type],
     flux: Field[[Edge, K], float_type],
@@ -208,7 +209,7 @@ def update_solution(
     return rho - dt / (vol * gac) * neighbor_sum(flux(V2E) * dual_face_orientation, axis=V2EDim)
 
 
-@field_operator(backend=build_config.backend)
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def advect_density(
     rho: Field[[Vertex, K], float_type],
     dt: float_type,
@@ -242,7 +243,7 @@ def advect_density(
     return rho
 
 
-@program(backend=build_config.backend)
+@program(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def mpdata_program(
     rho0: Field[[Vertex, K], float_type],
     rho1: Field[[Vertex, K], float_type],
@@ -345,7 +346,7 @@ def mpdata_program(
     )  # out is final solution (Vertex)
 
 
-@field_operator(backend=build_config.backend)
+@field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
 def upwind_scheme(
     rho: Field[[Vertex, K], float_type],
     dt: float_type,
