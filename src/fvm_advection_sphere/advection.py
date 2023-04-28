@@ -196,14 +196,6 @@ def local_max(
     return maximum(psi, max_over(psi(V2V), axis=V2VDim))
 
 
-# @field_operator(backend=build_config.backend)
-# def add_ab2c_vertex(
-#    a: Field[[Vertex], float_type],
-#    b: Field[[Vertex], float_type],
-# ) -> Field[[Vertex], float_type]:
-#    return a + b
-
-
 @field_operator(backend=build_config.backend)
 def update_solution(
     rho: Field[[Vertex, K], float_type],

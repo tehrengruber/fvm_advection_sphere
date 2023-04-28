@@ -234,21 +234,6 @@ for i in range(niter):
         offset_provider=mesh.offset_provider,
     )
 
-    # mpdata_scheme(
-    #    state.rho,
-    #    δt,
-    #    mesh.vol,
-    #    metric.gac,
-    #    state.vel[0],
-    #    state.vel[1],
-    #    mesh.pole_edge_mask,
-    #    mesh.dual_face_orientation,
-    #    mesh.dual_face_normal_weighted_x,
-    #    mesh.dual_face_normal_weighted_y,
-    #    out=state_next.rho,
-    #    offset_provider=mesh.offset_provider,
-    # )
-
     state, state_next = state_next, state  # "pointer swap"
 
     update_periodic_layers(mesh, state.rho)
