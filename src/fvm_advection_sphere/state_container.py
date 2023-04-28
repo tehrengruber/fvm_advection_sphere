@@ -21,7 +21,7 @@ def allocate_field(mesh, type_: Field | type_spec.FieldType | type_spec.TupleTyp
         return tuple(allocate_field(mesh, el_type) for el_type in type_.types)
     elif isinstance(type_, type_spec.FieldType):
         np_dtype_map = {
-            type_spec.ScalarKind.INT: np.int,
+            type_spec.ScalarKind.INT: int,
             type_spec.ScalarKind.INT32: np.int32,
             type_spec.ScalarKind.INT64: np.int64,
             type_spec.ScalarKind.FLOAT32: np.float32,
