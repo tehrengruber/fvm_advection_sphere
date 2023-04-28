@@ -3,11 +3,11 @@ name: Execute tests & model
 on:
   push:
     branches:
-      - main
+      - master
       - ci
   pull_request:
     branches:
-      - main
+      - master
 
 jobs:
   run_advection:
