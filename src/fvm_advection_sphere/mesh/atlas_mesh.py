@@ -309,8 +309,6 @@ class AtlasMesh:
             "V2V": v2v,
             "V2E": v2e,
             "E2V": e2v,
-            "V2EDim": V2EDim,
-            "E2VDim": E2VDim,
             "Koff": K  # TODO(tehrengruber): using K here gives a terrible compilation error. Improve in GT4Py!
         }
 

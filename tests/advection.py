@@ -160,48 +160,15 @@ def initial_velocity(
     vel_z = broadcast(0., (Vertex, K))
     return vel_x, vel_y, vel_z
 
-
-@field_operator(backend=build_config.backend)
-def initial_velocity_x(
-    mesh_xydeg_x: Field[[Vertex], float_type],
-    mesh_xydeg_y: Field[[Vertex], float_type],
-    metric_gac: Field[[Vertex], float_type],
-    metric_g11: Field[[Vertex], float_type],
-    metric_g22: Field[[Vertex], float_type],
-) -> Field[[Vertex, K], float_type]:
-    return initial_velocity(mesh_xydeg_x, mesh_xydeg_y, metric_gac, metric_g11, metric_g22)[0]
-
-
-@field_operator(backend=build_config.backend)
-def initial_velocity_y(
-    mesh_xydeg_x: Field[[Vertex], float_type],
-    mesh_xydeg_y: Field[[Vertex], float_type],
-    metric_gac: Field[[Vertex], float_type],
-    metric_g11: Field[[Vertex], float_type],
-    metric_g22: Field[[Vertex], float_type],
-) -> Field[[Vertex, K], float_type]:
-    return initial_velocity(mesh_xydeg_x, mesh_xydeg_y, metric_gac, metric_g11, metric_g22)[1]
-
-@field_operator(backend=build_config.backend)
-def initial_velocity_z(
-    mesh_xydeg_x: Field[[Vertex], float_type],
-    mesh_xydeg_y: Field[[Vertex], float_type],
-    metric_gac: Field[[Vertex], float_type],
-    metric_g11: Field[[Vertex], float_type],
-    metric_g22: Field[[Vertex], float_type],
-) -> Field[[Vertex, K], float_type]:
-    return initial_velocity(mesh_xydeg_x, mesh_xydeg_y, metric_gac, metric_g11, metric_g22)[2]
-
-for i, initializer in enumerate([initial_velocity_x, initial_velocity_y, initial_velocity_z]):
-    initializer(
-        mesh.xydeg_x,
-        mesh.xydeg_y,
-        metric.gac,
-        metric.g11,
-        metric.g22,
-        out=state.vel[i],
-        offset_provider=mesh.offset_provider,
-    )
+initial_velocity(
+    mesh.xydeg_x,
+    mesh.xydeg_y,
+    metric.gac,
+    metric.g11,
+    metric.g22,
+    out=state.vel,
+    offset_provider=mesh.offset_provider,
+)
 
 print(
     f"rho0 | min, max, avg : {np.min(state.rho)}, {np.max(state.rho)}, {np.average(state.rho)} | "
@@ -240,6 +207,7 @@ for i in range(niter):
     #    metric.gac,
     #    state.vel[0],
     #    state.vel[1],
+    #    state.vel[2],
     #    mesh.pole_edge_mask,
     #    mesh.dual_face_orientation,
     #    mesh.dual_face_normal_weighted_x,
