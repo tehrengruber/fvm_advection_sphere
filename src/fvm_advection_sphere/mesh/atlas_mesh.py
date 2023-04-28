@@ -349,7 +349,6 @@ class AtlasMesh:
             dual_face_normal_weighted_y=dual_face_normal_weighted_y,
             dual_face_orientation_np=dual_face_orientation_np,
             dual_face_orientation=dual_face_orientation,
-            dual_face_orientation_flat=dual_face_orientation_flat,
             offset_provider=offset_provider,
             grid_description=str(grid),
             # for debugging
