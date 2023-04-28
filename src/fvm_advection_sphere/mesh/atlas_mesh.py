@@ -22,7 +22,7 @@ from atlas4py import (
 )
 
 from fvm_advection_sphere.build_config import float_type
-from fvm_advection_sphere.common import Cell, Edge, Vertex, K, V2EDim, VertexEdgeNb, E2VDim
+from fvm_advection_sphere.common import Cell, Edge, Vertex, K, V2EDim, E2VDim
 
 from gt4py.next.common import Dimension, Field, Connectivity, DimensionKind
 from gt4py.next.iterator.embedded import NeighborTableOffsetProvider, np_as_located_field
@@ -101,7 +101,6 @@ class AtlasMesh:
     v2v: Connectivity
     e2v: Connectivity
     e2c: Connectivity
-    v2ve: Connectivity
 
     c2v_np: np.ndarray
     c2e_np: np.ndarray
@@ -143,7 +142,7 @@ class AtlasMesh:
     dual_face_normal_weighted_np: np.ndarray
 
     dual_face_orientation: Field[[Vertex, V2EDim], float_type]
-    dual_face_orientation_flat: Field[[VertexEdgeNb], float_type]
+
     dual_face_orientation_np: np.ndarray
 
     offset_provider: dict[str, Connectivity | Dimension]
@@ -220,15 +219,6 @@ class AtlasMesh:
         e2c = NeighborTableOffsetProvider(e2c_np, Edge, Cell, e2c_np.shape[1])
         c2v = NeighborTableOffsetProvider(c2v_np, Cell, Vertex, c2v_np.shape[1])
         c2e = NeighborTableOffsetProvider(c2e_np, Cell, Edge, c2e_np.shape[1])
-        v2ve = NeighborTableOffsetProvider(
-            np.reshape(
-                np.arange(0, num_vertices * v2e.max_neighbors, 1, dtype=np.int32),
-                (num_vertices, v2e.max_neighbors),
-            ),
-            Vertex,
-            VertexEdgeNb,
-            v2e.max_neighbors,
-        )
 
         vertex_remote_indices = np.array(mesh.nodes.field("remote_idx"), copy=False)
         edge_remote_indices = np.array(mesh.edges.field("remote_idx"), copy=False)
@@ -271,7 +261,6 @@ class AtlasMesh:
                 inum_pole_edge += 1
                 pole_edges[inum_pole_edge] = e
 
-        dual_face_orientation_flat = np.zeros(num_vertices * edges_per_node)
         for v in range(0, num_vertices):
             for e_nb in range(0, edges_per_node):
                 e = v2e_np[v, e_nb]
@@ -287,11 +276,7 @@ class AtlasMesh:
                 else:
                     dual_face_orientation_np[v, e_nb] = np.nan
                     v2v_np[v, e_nb] = -1
-                dual_face_orientation_flat[edges_per_node * v + e_nb] = dual_face_orientation_np[
-                    v, e_nb
-                ]
         dual_face_orientation = np_as_located_field(Vertex, V2EDim)(dual_face_orientation_np)
-        dual_face_orientation_flat = np_as_located_field(VertexEdgeNb)(dual_face_orientation_flat)
 
         # dual normal
         dual_face_normal_weighted_np = (
@@ -335,7 +320,6 @@ class AtlasMesh:
             c2e_np=c2e_np,
             e2c=e2c,
             e2c_np=e2c_np,
-            v2ve=v2ve,
             # poles
             pole_edge_mask=pole_edge_mask,
             pole_edge_mask_np=pole_edge_mask_np,
