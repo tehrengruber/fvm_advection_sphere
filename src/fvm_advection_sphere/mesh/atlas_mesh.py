@@ -21,18 +21,20 @@ from atlas4py import (
     BlockConnectivity,
 )
 
-from fvm_advection_sphere.common import dtype, Cell, Edge, Vertex, K, V2EDim, VertexEdgeNb, E2VDim
+from fvm_advection_sphere.build_config import float_type
+from fvm_advection_sphere.common import Cell, Edge, Vertex, K, V2EDim, VertexEdgeNb, E2VDim
 
-from functional.common import Dimension, Field, Connectivity, DimensionKind
-from functional.iterator.embedded import NeighborTableOffsetProvider, np_as_located_field
+from gt4py.next.common import Dimension, Field, Connectivity, DimensionKind
+from gt4py.next.iterator.embedded import NeighborTableOffsetProvider, np_as_located_field
 
-rpi: Final[float] = 2.0 * math.asin(1.0)
-deg2rad: Final[float] = 2.0 * rpi / 360.0
+rpi: Final[float_type] = 2.0 * math.asin(1.0)
+deg2rad: Final[float_type] = 2.0 * rpi / 360.0
 
 DIMENSION_TO_SIZE_ATTR: dict[Dimension, str] = {
     Vertex: "num_vertices",
     Edge: "num_edges",
     Cell: "num_cells",
+    K: "num_level"
 }
 
 
@@ -86,13 +88,17 @@ class AtlasMesh:
     num_vertices: int
     num_edges: int
     num_cells: int
+    num_level: int
     num_pole_edges: int
+    nb_vertices_ghost: int
+    nb_vertices_noghost: int
 
     # connectivities
     c2v: Connectivity
     c2e: Connectivity
     v2e: Connectivity
     v2c: Connectivity
+    v2v: Connectivity
     e2v: Connectivity
     e2c: Connectivity
     v2ve: Connectivity
@@ -101,6 +107,7 @@ class AtlasMesh:
     c2e_np: np.ndarray
     v2e_np: np.ndarray
     v2c_np: np.ndarray
+    v2v_np: np.ndarray
     e2v_np: np.ndarray
     e2c_np: np.ndarray
 
@@ -120,23 +127,23 @@ class AtlasMesh:
     vertex_ghost_mask: Field[[Vertex], bool]
 
     # geometry
-    radius: dtype
-    xydeg_x: Field[[Vertex], dtype]
-    xydeg_y: Field[[Vertex], dtype]
+    radius: float_type
+    xydeg_x: Field[[Vertex], float_type]
+    xydeg_y: Field[[Vertex], float_type]
     xydeg_np: np.ndarray
     xyrad: np.ndarray
     xyarc: np.ndarray
     xyz: np.ndarray
 
-    vol: Field[[Edge], dtype]
+    vol: Field[[Edge], float_type]
     vol_np: np.ndarray
 
-    dual_face_normal_weighted_x: Field[[Edge], dtype]
-    dual_face_normal_weighted_y: Field[[Edge], dtype]
+    dual_face_normal_weighted_x: Field[[Edge], float_type]
+    dual_face_normal_weighted_y: Field[[Edge], float_type]
     dual_face_normal_weighted_np: np.ndarray
 
-    dual_face_orientation: Field[[Vertex, V2EDim], dtype]
-    dual_face_orientation_flat: Field[[VertexEdgeNb], dtype]
+    dual_face_orientation: Field[[Vertex, V2EDim], float_type]
+    dual_face_orientation_flat: Field[[VertexEdgeNb], float_type]
     dual_face_orientation_np: np.ndarray
 
     offset_provider: dict[str, Connectivity | Dimension]
@@ -152,23 +159,25 @@ class AtlasMesh:
             f"""
         Atlas mesh
           grid:     {self.grid_description}
-          vertices: {str(self.num_vertices).rjust(n)}
+          vertices: {str(self.num_vertices).rjust(n)}  (ghost: {str(self.nb_vertices_ghost).rjust(n)}, noghost: {str(self.nb_vertices_noghost).rjust(n)})
           edges:    {str(self.num_edges).rjust(n)}
           cells:    {str(self.num_cells).rjust(n)}
+          level:    {str(self.num_level).rjust(n)}
         """
         )
 
     @classmethod
-    def generate(cls, grid=StructuredGrid("O32"), radius=6371.22e03, config=None) -> "AtlasMesh":
+    def generate(cls, grid, num_level: int, radius=6371.22e03, config=None) -> "AtlasMesh":
         if config is None:
             config = Config()
             config["triangulate"] = False
             config["angle"] = -1.0
             config["pole_edges"] = True
+            config["ghost_at_end"] = True
 
         # generate mesh from grid points
         # mesh = _build_atlas_mesh(config, grid)
-        mesh = _build_atlas_mesh(config, grid, periodic_halos=2)
+        mesh = _build_atlas_mesh(config, grid, periodic_halos=10)
 
         num_cells = mesh.cells.size
         num_edges = mesh.edges.size
@@ -183,10 +192,15 @@ class AtlasMesh:
             (vertex_flags & Topology.GHOST).astype(bool)
         )
 
+        nb_vertices_ghost = np.sum(np.where(vertex_ghost_mask, 1, 0), dtype=np.int32)
+        nb_vertices_noghost = num_vertices - nb_vertices_ghost
+        assert nb_vertices_noghost == np.sum(grid.nx)
+
         #
         # connectivities
         v2e_np = _atlas_connectivity_to_numpy(mesh.nodes.edge_connectivity)
         v2c_np = _atlas_connectivity_to_numpy(mesh.nodes.cell_connectivity)
+        v2v_np = np.zeros(v2e_np.shape, dtype=np.int32)  # initialized further below
         e2v_np = _atlas_connectivity_to_numpy(mesh.edges.node_connectivity)
         e2c_np = _atlas_connectivity_to_numpy(mesh.edges.cell_connectivity)
         c2v_np = _atlas_connectivity_to_numpy(mesh.cells.node_connectivity)
@@ -201,6 +215,7 @@ class AtlasMesh:
 
         v2e = NeighborTableOffsetProvider(v2e_np, Vertex, Edge, v2e_np.shape[1])
         v2c = NeighborTableOffsetProvider(v2c_np, Vertex, Cell, v2c_np.shape[1])
+        v2v = NeighborTableOffsetProvider(v2v_np, Vertex, Vertex, v2v_np.shape[1])
         e2v = NeighborTableOffsetProvider(e2v_np, Edge, Vertex, e2v_np.shape[1])
         e2c = NeighborTableOffsetProvider(e2c_np, Edge, Cell, e2c_np.shape[1])
         c2v = NeighborTableOffsetProvider(c2v_np, Cell, Vertex, c2v_np.shape[1])
@@ -260,12 +275,18 @@ class AtlasMesh:
         for v in range(0, num_vertices):
             for e_nb in range(0, edges_per_node):
                 e = v2e_np[v, e_nb]
-                if v == e2v_np[e, 0]:
-                    dual_face_orientation_np[v, e_nb] = 1.0
-                else:
-                    dual_face_orientation_np[v, e_nb] = -1.0
-                    if is_pole_edge(e):
+                if e != -1:
+                    if v == e2v_np[e, 0]:
                         dual_face_orientation_np[v, e_nb] = 1.0
+                        v2v_np[v, e_nb] = e2v_np[e, 1]
+                    else:
+                        dual_face_orientation_np[v, e_nb] = -1.0
+                        v2v_np[v, e_nb] = e2v_np[e, 0]
+                        if is_pole_edge(e):
+                            dual_face_orientation_np[v, e_nb] = 1.0
+                else:
+                    dual_face_orientation_np[v, e_nb] = np.nan
+                    v2v_np[v, e_nb] = -1
                 dual_face_orientation_flat[edges_per_node * v + e_nb] = dual_face_orientation_np[
                     v, e_nb
                 ]
@@ -284,24 +305,34 @@ class AtlasMesh:
         vol = np_as_located_field(Vertex)(vol_np)
 
         # offset provider
-        offset_provider = {"E2V": e2v, "V2E": v2e, "V2EDim": V2EDim, "E2VDim": E2VDim}
+        offset_provider = {
+            "V2V": v2v,
+            "V2E": v2e,
+            "E2V": e2v,
+            "Koff": K  # TODO(tehrengruber): using K here gives a terrible compilation error. Improve in GT4Py!
+        }
 
         return cls(
             num_vertices=num_vertices,
             num_edges=num_edges,
             num_pole_edges=num_pole_edges,
             num_cells=num_cells,
+            num_level=num_level,
+            nb_vertices_ghost=nb_vertices_ghost,
+            nb_vertices_noghost=nb_vertices_noghost,
             # connectivities
-            c2v=c2v,
-            c2v_np=c2v_np,
-            c2e=c2e,
-            c2e_np=c2e_np,
+            v2v=v2v,
+            v2v_np=v2v_np,
             v2e=v2e,
             v2e_np=v2e_np,
             v2c=v2c,
             v2c_np=v2c_np,
             e2v=e2v,
             e2v_np=e2v_np,
+            c2v=c2v,
+            c2v_np=c2v_np,
+            c2e=c2e,
+            c2e_np=c2e_np,
             e2c=e2c,
             e2c_np=e2c_np,
             v2ve=v2ve,
@@ -348,6 +379,11 @@ def update_periodic_layers(mesh: AtlasMesh, field: Field):
     assert horizontal_dimension.kind == DimensionKind.HORIZONTAL
     remote_indices = mesh.remote_indices[horizontal_dimension]
 
-    for hid in range(getattr(mesh, DIMENSION_TO_SIZE_ATTR[horizontal_dimension])):
-        if remote_indices[hid] != hid:
-            field[hid] = field[remote_indices[hid]]
+    # numpy version
+    periodic_indices = np.where(remote_indices != np.arange(0, getattr(mesh, DIMENSION_TO_SIZE_ATTR[horizontal_dimension])))
+    field[periodic_indices, :] = field[remote_indices[periodic_indices], :]
+
+    # verbose version
+    #for hid in range(getattr(mesh, DIMENSION_TO_SIZE_ATTR[horizontal_dimension])):
+    #    if remote_indices[hid] != hid:
+    #        field[hid] = field[remote_indices[hid]]

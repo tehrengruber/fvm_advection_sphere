@@ -1,0 +1,28 @@
+name: Execute tests & model
+
+on:
+  push:
+    branches:
+      - main
+      - ci
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  run_advection:
+    runs-on: self-hosted
+    steps:
+    - uses: actions/checkout@v3
+    - name: Bootstrap venv
+      run: python -m venv venv
+    - name: Install package
+      run: |
+        source venv/bin/activate
+        pip install -e .
+    - name: Run test cases with analytical solution
+      run: |
+        source venv/bin/activate
+        pushd tests
+        python advection.py
+        popd

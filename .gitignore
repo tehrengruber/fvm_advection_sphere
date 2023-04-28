@@ -19,6 +19,9 @@ model.log*
 *.png
 *.gif
 *.npz
+*.nc
+*.grib
+*.grb
 
 # Distribution / packaging
 .Python

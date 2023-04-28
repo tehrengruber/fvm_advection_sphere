@@ -1,29 +1,37 @@
 import dataclasses
 import numpy as np
 
-from functional.iterator.embedded import LocatedField, np_as_located_field
-from functional.ffront.fbuiltins import Field
-from functional.ffront.symbol_makers import make_symbol_type_from_typing
-import functional.ffront.common_types as ct
+from gt4py.next.iterator.embedded import LocatedField, np_as_located_field
+from gt4py.next.ffront.fbuiltins import Field
+from gt4py.next.ffront import type_translation as type_translation
+import gt4py.next.type_system.type_specifications as type_spec
 
+from fvm_advection_sphere.build_config import float_type
 from fvm_advection_sphere.mesh.atlas_mesh import DIMENSION_TO_SIZE_ATTR
 from fvm_advection_sphere.common import Vertex, Edge, Cell, K
 
 
-def allocate_field(mesh, type_: Field | ct.FieldType | ct.TupleType):
+def allocate_field(mesh, type_: Field | type_spec.FieldType | type_spec.TupleType):
     """
     Allocate a field of zeros of given type.
 
-    >>> allocate_field(mesh, Field[[Vertex], float])
+    >>> allocate_field(mesh, Field[[Vertex], float_type])
     """
-    if isinstance(type_, ct.TupleType):
+    if isinstance(type_, type_spec.TupleType):
         return tuple(allocate_field(mesh, el_type) for el_type in type_.types)
-    elif isinstance(type_, ct.FieldType):
+    elif isinstance(type_, type_spec.FieldType):
+        np_dtype_map = {
+            type_spec.ScalarKind.INT: np.int,
+            type_spec.ScalarKind.INT32: np.int32,
+            type_spec.ScalarKind.INT64: np.int64,
+            type_spec.ScalarKind.FLOAT32: np.float32,
+            type_spec.ScalarKind.FLOAT64: np.float64,
+        } # TODO(tehrengruber): find a cleaner way
         shape = [getattr(mesh, DIMENSION_TO_SIZE_ATTR[dim]) for dim in type_.dims]
-        return np_as_located_field(*type_.dims)(np.zeros(shape))
+        return np_as_located_field(*type_.dims)(np.zeros(shape, dtype=np_dtype_map[type_.dtype.kind]))
 
     try:
-        type_ = make_symbol_type_from_typing(type_)
+        type_ = type_translation.from_type_hint(type_)
         return allocate_field(mesh, type_)
     except Exception as e:
         raise ValueError(f"Type `{type_}` not understood.") from e
@@ -31,8 +39,12 @@ def allocate_field(mesh, type_: Field | ct.FieldType | ct.TupleType):
 
 @dataclasses.dataclass
 class StateContainer:
-    rho: Field[[Vertex], float]
-    vel: tuple[Field[[Vertex], float], Field[[Vertex], float]]
+    rho: Field[[Vertex, K], float_type]
+    vel: tuple[
+        Field[[Vertex, K], float_type],
+        Field[[Vertex, K], float_type],
+        Field[[Vertex, K], float_type]
+    ]
 
     @classmethod
     def from_mesh(cls, mesh):
@@ -43,6 +55,6 @@ class StateContainer:
         """
         fields: dict[str, LocatedField] = {}
         for attr in dataclasses.fields(cls):
-            type_ = make_symbol_type_from_typing(attr.type)
+            type_ = type_translation.from_type_hint(attr.type)
             fields[attr.name] = allocate_field(mesh, type_)
         return cls(**fields)
