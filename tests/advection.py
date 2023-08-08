@@ -7,7 +7,7 @@ from timeit import default_timer as timer
 
 from gt4py.next.common import GridType
 from gt4py.next.ffront.decorator import field_operator
-from gt4py.next.ffront.fbuiltins import arccos, sin, cos, where, minimum, Field, broadcast
+from gt4py.next.ffront.fbuiltins import arccos, sin, cos, where, minimum, Field, broadcast, int32
 from fvm_advection_sphere.build_config import float_type
 from fvm_advection_sphere.common import *
 from fvm_advection_sphere import build_config
@@ -88,7 +88,7 @@ origin = mesh.xyarc.min(axis=0)
 extent = mesh.xyarc.max(axis=0) - mesh.xyarc.min(axis=0)
 xlim = (min(mesh.xyarc[:, 0]), max(mesh.xyarc[:, 0]))
 ylim = (min(mesh.xyarc[:, 1]), max(mesh.xyarc[:, 1]))
-level_indices = allocate_field(mesh, Field[[K], int])
+level_indices = allocate_field(mesh, Field[[K], int32])
 level_indices[...] = np.arange(0., mesh.num_level)
 
 # initialize fields

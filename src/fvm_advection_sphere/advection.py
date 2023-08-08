@@ -8,6 +8,7 @@ from gt4py.next.ffront.fbuiltins import (
     abs,
     maximum,
     minimum,
+    int32
 )
 from gt4py.next.ffront.decorator import field_operator, program
 
@@ -20,14 +21,14 @@ def with_boundary_values(
         lower: Field[[Vertex, K], float_type],
         interior: Field[[Vertex, K], float_type],
         upper: Field[[Vertex, K], float_type],
-        level_indices: Field[[K], int],
-        num_level: int
+        level_indices: Field[[K], int32],
+        num_level: int32
 ) -> Field[[Vertex, K], float_type]:
     return where(level_indices == 0, lower, where(level_indices == num_level - 1, upper, interior))
 
 # TODO(tehrengruber): move to seperate file
 @field_operator(backend=build_config.backend, grid_type=GridType.UNSTRUCTURED)
-def nabla_z(psi: Field[[Vertex, K], float_type], level_indices: Field[[K], int], num_level: int):
+def nabla_z(psi: Field[[Vertex, K], float_type], level_indices: Field[[K], int32], num_level: int32):
     return with_boundary_values(
         psi(Koff[1]) - psi(Koff[0]),
         psi(Koff[1]) - psi(Koff[-1]),
