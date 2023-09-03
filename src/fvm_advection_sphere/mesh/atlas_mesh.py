@@ -358,7 +358,7 @@ class AtlasMesh:
 
 def update_periodic_layers(mesh: AtlasMesh, field: Field):
     # todo: generalize to other dimensions
-    horizontal_dimension = field.axes[0]
+    horizontal_dimension = field._axes[0]
     assert horizontal_dimension.kind == DimensionKind.HORIZONTAL
     remote_indices = mesh.remote_indices[horizontal_dimension]
 
