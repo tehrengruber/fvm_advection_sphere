@@ -171,17 +171,15 @@ initial_velocity(
 )
 
 print(
-    f"rho0 | min, max, avg : {np.min(state.rho)}, {np.max(state.rho)}, {np.average(state.rho)} | "
+    f"rho0 | min, max, avg : {np.min(state.rho.asnumpy())}, {np.max(state.rho.asnumpy())}, {np.average(state.rho.asnumpy())} | "
 )
 
 state_next.vel = state.vel  # constant velocity for now
 start = timer()
 
 # TODO(tehrengruber): use somewhere meaningful and remove from here
-np.asarray(tmp_fields[f"tmp_vertex_0"])[...] = np.arange(0., mesh.num_level)[np.newaxis, :]
+tmp_fields[f"tmp_vertex_0"].asnumpy()[...] = np.arange(0., mesh.num_level)[np.newaxis, :]
 nabla_z(tmp_fields[f"tmp_vertex_0"], level_indices, mesh.num_level, out=tmp_fields[f"tmp_vertex_1"], offset_provider=mesh.offset_provider)
-
-bla = np.array(tmp_fields[f"tmp_vertex_1"])
 
 for i in range(niter):
 
@@ -200,39 +198,39 @@ for i in range(niter):
     #    offset_provider=mesh.offset_provider,
     # )
 
-    # upwind_scheme(
-    #    state.rho,
-    #    δt,
-    #    mesh.vol,
-    #    metric.gac,
-    #    state.vel[0],
-    #    state.vel[1],
-    #    state.vel[2],
-    #    mesh.pole_edge_mask,
-    #    mesh.dual_face_orientation,
-    #    mesh.dual_face_normal_weighted_x,
-    #    mesh.dual_face_normal_weighted_y,
-    #    out=state_next.rho,
-    #    offset_provider=mesh.offset_provider,
-    # )
-
-    mpdata_program(
-        state.rho,
-        state_next.rho,
-        δt,
-        eps,
-        mesh.vol,
-        metric.gac,
-        state.vel[0],
-        state.vel[1],
-        state.vel[2],
-        mesh.pole_edge_mask,
-        mesh.dual_face_orientation,
-        mesh.dual_face_normal_weighted_x,
-        mesh.dual_face_normal_weighted_y,
-        **tmp_fields,
-        offset_provider=mesh.offset_provider,
+    upwind_scheme(
+       state.rho,
+       δt,
+       mesh.vol,
+       metric.gac,
+       state.vel[0],
+       state.vel[1],
+       state.vel[2],
+       mesh.pole_edge_mask,
+       mesh.dual_face_orientation,
+       mesh.dual_face_normal_weighted_x,
+       mesh.dual_face_normal_weighted_y,
+       out=state_next.rho,
+       offset_provider=mesh.offset_provider,
     )
+
+    # mpdata_program(
+    #     state.rho,
+    #     state_next.rho,
+    #     δt,
+    #     eps,
+    #     mesh.vol,
+    #     metric.gac,
+    #     state.vel[0],
+    #     state.vel[1],
+    #     state.vel[2],
+    #     mesh.pole_edge_mask,
+    #     mesh.dual_face_orientation,
+    #     mesh.dual_face_normal_weighted_x,
+    #     mesh.dual_face_normal_weighted_y,
+    #     **tmp_fields,
+    #     offset_provider=mesh.offset_provider,
+    # )
 
     state, state_next = state_next, state  # "pointer swap"
 
@@ -243,7 +241,7 @@ for i in range(niter):
     # end_plotting = timer()
     # print(f"Plotting {i} ({end_plotting - start_plotting}s)")
     print(
-        f"rho | min, max, avg : {np.min(state.rho)}, {np.max(state.rho)}, {np.average(state.rho)} | "
+        f"rho | min, max, avg : {np.min(state.rho.asnumpy())}, {np.max(state.rho.asnumpy())}, {np.average(state.rho.asnumpy())} | "
     )
 
     print(f"Timestep {i}")

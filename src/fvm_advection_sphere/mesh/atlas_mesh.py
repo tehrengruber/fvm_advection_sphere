@@ -25,7 +25,8 @@ from fvm_advection_sphere.build_config import float_type
 from fvm_advection_sphere.common import Cell, Edge, Vertex, K, V2EDim, E2VDim
 
 from gt4py.next.common import Dimension, Field, Connectivity, DimensionKind
-from gt4py.next.iterator.embedded import NeighborTableOffsetProvider, np_as_located_field
+from gt4py.next.iterator.embedded import NeighborTableOffsetProvider
+from gt4py.next import as_field
 
 rpi: Final[float_type] = 2.0 * math.asin(1.0)
 deg2rad: Final[float_type] = 2.0 * rpi / 360.0
@@ -187,11 +188,9 @@ class AtlasMesh:
         edge_flags = np.array(mesh.edges.flags(), copy=False)
         cell_flags = np.array(mesh.cells.flags(), copy=False)
 
-        vertex_ghost_mask = np_as_located_field(Vertex)(
-            (vertex_flags & Topology.GHOST).astype(bool)
-        )
-
-        nb_vertices_ghost = np.sum(np.where(vertex_ghost_mask, 1, 0), dtype=np.int32)
+        vertex_ghost_mask = as_field([Vertex], (vertex_flags & Topology.GHOST).astype(bool))
+        
+        nb_vertices_ghost = np.sum(np.where(vertex_ghost_mask.asnumpy(), 1, 0), dtype=np.int32)
         nb_vertices_noghost = num_vertices - nb_vertices_ghost
         assert nb_vertices_noghost == np.sum(grid.nx)
 
@@ -228,8 +227,8 @@ class AtlasMesh:
         # geometrical properties
         #
         xydeg_np = np.array(mesh.nodes.lonlat, copy=False)
-        xydeg_x = np_as_located_field(Vertex)(xydeg_np[:, 0])
-        xydeg_y = np_as_located_field(Vertex)(xydeg_np[:, 1])
+        xydeg_x = as_field([Vertex], xydeg_np[:, 0])
+        xydeg_y = as_field([Vertex], xydeg_np[:, 1])
         xyrad = np.array(mesh.nodes.lonlat, copy=False) * deg2rad
         xyarc = np.array(mesh.nodes.lonlat, copy=False) * deg2rad * radius
         phi, theta = xyrad[:, 1], xyrad[:, 0]
@@ -252,7 +251,7 @@ class AtlasMesh:
             if is_pole_edge(e):
                 num_pole_edges += 1
                 pole_edge_mask_np[e] = True
-        pole_edge_mask = np_as_located_field(Edge)(pole_edge_mask_np)
+        pole_edge_mask = as_field([Edge], pole_edge_mask_np)
 
         pole_edges = np.zeros(num_pole_edges, dtype=np.int32)
         inum_pole_edge = -1
@@ -276,18 +275,18 @@ class AtlasMesh:
                 else:
                     dual_face_orientation_np[v, e_nb] = np.nan
                     v2v_np[v, e_nb] = -1
-        dual_face_orientation = np_as_located_field(Vertex, V2EDim)(dual_face_orientation_np)
+        dual_face_orientation = as_field([Vertex, V2EDim], dual_face_orientation_np)
 
         # dual normal
         dual_face_normal_weighted_np = (
             np.array(mesh.edges.field("dual_normals"), copy=False) * radius * deg2rad
         )
-        dual_face_normal_weighted_x = np_as_located_field(Edge)(dual_face_normal_weighted_np[:, 0])
-        dual_face_normal_weighted_y = np_as_located_field(Edge)(dual_face_normal_weighted_np[:, 1])
+        dual_face_normal_weighted_x = as_field([Edge], dual_face_normal_weighted_np[:, 0])
+        dual_face_normal_weighted_y = as_field([Edge], dual_face_normal_weighted_np[:, 1])
 
         # dual volume
         vol_np = np.array(mesh.nodes.field("dual_volumes"), copy=False) * deg2rad**2 * radius**2
-        vol = np_as_located_field(Vertex)(vol_np)
+        vol = as_field([Vertex], vol_np)
 
         # offset provider
         offset_provider = {
@@ -358,13 +357,13 @@ class AtlasMesh:
 
 def update_periodic_layers(mesh: AtlasMesh, field: Field):
     # todo: generalize to other dimensions
-    horizontal_dimension = field._axes[0]
+    horizontal_dimension = field.domain.dims[0]
     assert horizontal_dimension.kind == DimensionKind.HORIZONTAL
     remote_indices = mesh.remote_indices[horizontal_dimension]
 
     # numpy version
     periodic_indices = np.where(remote_indices != np.arange(0, getattr(mesh, DIMENSION_TO_SIZE_ATTR[horizontal_dimension])))
-    field[periodic_indices, :] = field[remote_indices[periodic_indices], :]
+    field.asnumpy()[periodic_indices, :] = field.asnumpy()[remote_indices[periodic_indices], :]
 
     # verbose version
     #for hid in range(getattr(mesh, DIMENSION_TO_SIZE_ATTR[horizontal_dimension])):
